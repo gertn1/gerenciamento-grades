@@ -1,0 +1,28 @@
+using GerenciamentoGradesApi.Models;
+
+namespace GerenciamentoGradesApi.Repositories.Interfaces;
+
+public interface IGradeRepository
+{
+    Task<IEnumerable<GradeListItem>> ListarAsync(int? codigo, string? nome);
+
+    Task<Grade?> ObterPorCodigoAsync(int codigo);
+
+    Task<IEnumerable<string>> ListarSkusPorGradeAsync(int codigo);
+
+    Task<int?> ObterCodigoPorNomeAsync(string nome);
+
+    Task<int> CriarAsync(string nome, string sigla);
+
+    Task<bool> AtualizarAsync(int codigo, string nome, string sigla);
+
+    Task<bool> ExcluirAsync(int codigo);
+
+    Task<HashSet<string>> FiltrarSkusExistentesAsync(IEnumerable<string> skus);
+
+    Task VincularSkusAsync(int codigo, IEnumerable<string> skus);
+
+    Task<HashSet<string>> FiltrarSkusVinculadosAsync(int codigo, IEnumerable<string> skus);
+
+    Task DesvincularSkusAsync(int codigo, IEnumerable<string> skus);
+}

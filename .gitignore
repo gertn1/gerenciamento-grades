@@ -1,0 +1,9 @@
+# .NET
+**/bin/
+**/obj/
+**/.vs/
+*.user
+
+# Segredo local: contém a connection string real (senha) do banco COSMOS.
+# Não deve ir para o git. Use variável de ambiente/secret manager em produção.
+backend/GerenciamentoGradesApi/appsettings.Development.json

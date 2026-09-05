@@ -1,0 +1,36 @@
+<Solution>
+  <Project Path="backend/GerenciamentoGradesApi/GerenciamentoGradesApi.csproj" />
+  <Folder Name="/frontend/">
+    <File Path="frontend/grades-web/README.md" />
+    <File Path="frontend/grades-web/package.json" />
+    <File Path="frontend/grades-web/index.html" />
+    <File Path="frontend/grades-web/vite.config.ts" />
+    <File Path="frontend/grades-web/tsconfig.json" />
+    <File Path="frontend/grades-web/tsconfig.app.json" />
+    <File Path="frontend/grades-web/tsconfig.node.json" />
+    <File Path="frontend/grades-web/.env" />
+    <File Path="frontend/grades-web/.gitignore" />
+  </Folder>
+  <Folder Name="/frontend/public/">
+    <File Path="frontend/grades-web/public/favicon.svg" />
+  </Folder>
+  <Folder Name="/frontend/src/">
+    <File Path="frontend/grades-web/src/App.tsx" />
+    <File Path="frontend/grades-web/src/main.tsx" />
+    <File Path="frontend/grades-web/src/index.css" />
+  </Folder>
+  <Folder Name="/frontend/src/api/">
+    <File Path="frontend/grades-web/src/api/gradesApi.ts" />
+  </Folder>
+  <Folder Name="/frontend/src/components/">
+    <File Path="frontend/grades-web/src/components/AppHeader.tsx" />
+    <File Path="frontend/grades-web/src/components/GradesPage.tsx" />
+    <File Path="frontend/grades-web/src/components/GradeFormModal.tsx" />
+    <File Path="frontend/grades-web/src/components/GradeDetailModal.tsx" />
+    <File Path="frontend/grades-web/src/components/GradeDeleteModal.tsx" />
+    <File Path="frontend/grades-web/src/components/BulkOperationModal.tsx" />
+  </Folder>
+  <Folder Name="/frontend/src/types/">
+    <File Path="frontend/grades-web/src/types/grade.ts" />
+  </Folder>
+</Solution>
