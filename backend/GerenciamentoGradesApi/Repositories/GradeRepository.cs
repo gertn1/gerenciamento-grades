@@ -11,10 +11,12 @@ public class GradeRepository : IGradeRepository
     private const int TamanhoLote = 1000;
 
     private readonly IDbConnectionFactory _connectionFactory;
+    private readonly IAuditoriaRepository _auditoriaRepository;
 
-    public GradeRepository(IDbConnectionFactory connectionFactory)
+    public GradeRepository(IDbConnectionFactory connectionFactory, IAuditoriaRepository auditoriaRepository)
     {
         _connectionFactory = connectionFactory;
+        _auditoriaRepository = auditoriaRepository;
     }
 
     public async Task<IEnumerable<GradeListItem>> ListarAsync(int? codigo, string? nome)
@@ -86,7 +88,7 @@ public class GradeRepository : IGradeRepository
         return await connection.QuerySingleOrDefaultAsync<int?>(sql, new { Nome = nome });
     }
 
-    public async Task<int> CriarAsync(string nome, string sigla)
+    public async Task<int> CriarAsync(string nome, string sigla, string matricula)
     {
         // CODIGO é gerado pelo banco (IDENTITY/DEFAULT) — nunca é enviado no INSERT.
         const string sql = """
@@ -96,23 +98,33 @@ public class GradeRepository : IGradeRepository
             """;
 
         using var connection = _connectionFactory.CreateConnection();
-        return await connection.QuerySingleAsync<int>(sql, new { Nome = nome, Sigla = sigla });
+        connection.Open();
+        using var transaction = connection.BeginTransaction();
+
+        try
+        {
+            var codigo = await connection.QuerySingleAsync<int>(sql, new { Nome = nome, Sigla = sigla }, transaction);
+
+            await _auditoriaRepository.RegistrarAsync(new AuditoriaRegistro
+            {
+                TipoOperacao = "INSERT",
+                CodigoGrade = codigo,
+                EstadoAnterior = null,
+                EstadoNovo = new { Nome = nome, Sigla = sigla },
+                Matricula = matricula
+            }, connection, transaction);
+
+            transaction.Commit();
+            return codigo;
+        }
+        catch
+        {
+            transaction.Rollback();
+            throw;
+        }
     }
 
-    public async Task<bool> AtualizarAsync(int codigo, string nome, string sigla)
-    {
-        const string sql = """
-            UPDATE grade_precos
-            SET NOME = @Nome, SIGLA = @Sigla
-            WHERE CODIGO = @Codigo
-            """;
-
-        using var connection = _connectionFactory.CreateConnection();
-        var linhasAfetadas = await connection.ExecuteAsync(sql, new { Codigo = codigo, Nome = nome, Sigla = sigla });
-        return linhasAfetadas > 0;
-    }
-
-    public async Task<bool> ExcluirAsync(int codigo)
+    public async Task<bool> AtualizarAsync(int codigo, string nome, string sigla, string matricula)
     {
         using var connection = _connectionFactory.CreateConnection();
         connection.Open();
@@ -120,6 +132,60 @@ public class GradeRepository : IGradeRepository
 
         try
         {
+            var anterior = await connection.QuerySingleOrDefaultAsync<Grade>(
+                "SELECT CODIGO AS Codigo, NOME AS Nome, SIGLA AS Sigla FROM grade_precos WHERE CODIGO = @Codigo",
+                new { Codigo = codigo },
+                transaction);
+
+            if (anterior is null)
+            {
+                transaction.Rollback();
+                return false;
+            }
+
+            var linhasAfetadas = await connection.ExecuteAsync(
+                "UPDATE grade_precos SET NOME = @Nome, SIGLA = @Sigla WHERE CODIGO = @Codigo",
+                new { Codigo = codigo, Nome = nome, Sigla = sigla },
+                transaction);
+
+            await _auditoriaRepository.RegistrarAsync(new AuditoriaRegistro
+            {
+                TipoOperacao = "UPDATE",
+                CodigoGrade = codigo,
+                EstadoAnterior = new { anterior.Nome, anterior.Sigla },
+                EstadoNovo = new { Nome = nome, Sigla = sigla },
+                Matricula = matricula
+            }, connection, transaction);
+
+            transaction.Commit();
+            return linhasAfetadas > 0;
+        }
+        catch
+        {
+            transaction.Rollback();
+            throw;
+        }
+    }
+
+    public async Task<bool> ExcluirAsync(int codigo, string matricula)
+    {
+        using var connection = _connectionFactory.CreateConnection();
+        connection.Open();
+        using var transaction = connection.BeginTransaction();
+
+        try
+        {
+            var anterior = await connection.QuerySingleOrDefaultAsync<Grade>(
+                "SELECT CODIGO AS Codigo, NOME AS Nome, SIGLA AS Sigla FROM grade_precos WHERE CODIGO = @Codigo",
+                new { Codigo = codigo },
+                transaction);
+
+            if (anterior is null)
+            {
+                transaction.Rollback();
+                return false;
+            }
+
             await connection.ExecuteAsync(
                 "UPDATE PRODUTO_MESTRE SET CODIGO_GRADE_PRECOS = NULL WHERE CODIGO_GRADE_PRECOS = @Codigo",
                 new { Codigo = codigo },
@@ -129,6 +195,15 @@ public class GradeRepository : IGradeRepository
                 "DELETE FROM grade_precos WHERE CODIGO = @Codigo",
                 new { Codigo = codigo },
                 transaction);
+
+            await _auditoriaRepository.RegistrarAsync(new AuditoriaRegistro
+            {
+                TipoOperacao = "DELETE",
+                CodigoGrade = codigo,
+                EstadoAnterior = new { anterior.Nome, anterior.Sigla },
+                EstadoNovo = null,
+                Matricula = matricula
+            }, connection, transaction);
 
             transaction.Commit();
             return linhasAfetadas > 0;
@@ -160,20 +235,67 @@ public class GradeRepository : IGradeRepository
         return encontrados;
     }
 
-    public async Task VincularSkusAsync(int codigo, IEnumerable<string> skus)
+    public async Task VincularSkusAsync(int codigo, IEnumerable<string> skus, string matricula)
     {
-        const string sql = """
+        const string selecionarAnteriores = """
+            SELECT PRME_CD_PRODUTO AS Sku, CODIGO_GRADE_PRECOS AS CodigoGradeAnterior
+            FROM PRODUTO_MESTRE
+            WHERE PRME_CD_PRODUTO IN @Skus
+            """;
+
+        const string atualizar = """
             UPDATE PRODUTO_MESTRE
             SET CODIGO_GRADE_PRECOS = @Codigo
             WHERE PRME_CD_PRODUTO IN @Skus
             """;
 
         using var connection = _connectionFactory.CreateConnection();
+        connection.Open();
 
         foreach (var lote in skus.Distinct().Chunk(TamanhoLote))
         {
-            await connection.ExecuteAsync(sql, new { Codigo = codigo, Skus = lote });
+            using var transaction = connection.BeginTransaction();
+
+            try
+            {
+                var anteriores = (await connection.QueryAsync<SkuGradeAnterior>(selecionarAnteriores, new { Skus = lote }, transaction))
+                    .ToDictionary(x => x.Sku, x => x.CodigoGradeAnterior);
+
+                await connection.ExecuteAsync(atualizar, new { Codigo = codigo, Skus = lote }, transaction);
+
+                foreach (var sku in lote)
+                {
+                    anteriores.TryGetValue(sku, out var codigoAnterior);
+
+                    await _auditoriaRepository.RegistrarAsync(new AuditoriaRegistro
+                    {
+                        TipoOperacao = "UPDATE",
+                        CodigoGrade = codigo,
+                        Sku = sku,
+                        EstadoAnterior = new { CodigoGrade = codigoAnterior },
+                        EstadoNovo = new { CodigoGrade = codigo },
+                        Matricula = matricula
+                    }, connection, transaction);
+                }
+
+                transaction.Commit();
+            }
+            catch
+            {
+                transaction.Rollback();
+                throw;
+            }
         }
+    }
+
+    // Classe (não record) de propósito: PRME_CD_PRODUTO é INT no banco, mas o
+    // restante da API trata SKU como string; o mapeamento por propriedades do
+    // Dapper converte int -> string sem problema, o que o mapeamento posicional
+    // de um record (que exige o tipo exato do construtor) não faz.
+    private sealed class SkuGradeAnterior
+    {
+        public string Sku { get; set; } = string.Empty;
+        public int? CodigoGradeAnterior { get; set; }
     }
 
     public async Task<HashSet<string>> FiltrarSkusVinculadosAsync(int codigo, IEnumerable<string> skus)
@@ -196,8 +318,11 @@ public class GradeRepository : IGradeRepository
         return vinculados;
     }
 
-    public async Task DesvincularSkusAsync(int codigo, IEnumerable<string> skus)
+    public async Task DesvincularSkusAsync(int codigo, IEnumerable<string> skus, string matricula)
     {
+        // Assume que os SKUs recebidos já foram filtrados pelo chamador (via
+        // FiltrarSkusVinculadosAsync) e realmente estão vinculados a `codigo` —
+        // por isso o estado anterior de cada um é conhecido sem precisar reconsultar.
         const string sql = """
             UPDATE PRODUTO_MESTRE
             SET CODIGO_GRADE_PRECOS = NULL
@@ -205,10 +330,36 @@ public class GradeRepository : IGradeRepository
             """;
 
         using var connection = _connectionFactory.CreateConnection();
+        connection.Open();
 
         foreach (var lote in skus.Distinct().Chunk(TamanhoLote))
         {
-            await connection.ExecuteAsync(sql, new { Codigo = codigo, Skus = lote });
+            using var transaction = connection.BeginTransaction();
+
+            try
+            {
+                await connection.ExecuteAsync(sql, new { Codigo = codigo, Skus = lote }, transaction);
+
+                foreach (var sku in lote)
+                {
+                    await _auditoriaRepository.RegistrarAsync(new AuditoriaRegistro
+                    {
+                        TipoOperacao = "UPDATE",
+                        CodigoGrade = codigo,
+                        Sku = sku,
+                        EstadoAnterior = new { CodigoGrade = codigo },
+                        EstadoNovo = new { CodigoGrade = (int?)null },
+                        Matricula = matricula
+                    }, connection, transaction);
+                }
+
+                transaction.Commit();
+            }
+            catch
+            {
+                transaction.Rollback();
+                throw;
+            }
         }
     }
 }

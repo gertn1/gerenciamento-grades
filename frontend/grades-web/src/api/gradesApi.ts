@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { garantirMatricula } from '../auth/matricula';
 import type {
   AtualizarSkusResult,
   Grade,
@@ -12,6 +13,21 @@ import type {
 export const baseURL = import.meta.env.VITE_API_GRADES_URL ?? 'http://localhost:5244/api/grades';
 
 const api = axios.create({ baseURL });
+
+const METODOS_QUE_ALTERAM_DADOS = new Set(['post', 'put', 'delete', 'patch']);
+
+// Enquanto não existe login/SSO, toda chamada que altera dados precisa da
+// matrícula do usuário para o histórico de auditoria (ver Middleware/MatriculaMiddleware.cs
+// no back-end). Se ainda não tivermos uma, `garantirMatricula` abre o modal
+// de identificação (MatriculaGate) e só resolve quando o usuário confirmar.
+api.interceptors.request.use(async (config) => {
+  const metodo = config.method?.toLowerCase();
+  if (metodo && METODOS_QUE_ALTERAM_DADOS.has(metodo)) {
+    const matricula = await garantirMatricula();
+    config.headers.set('X-Matricula', matricula);
+  }
+  return config;
+});
 
 export async function listarGrades(filtro: { codigo?: number; nome?: string }): Promise<GradeListItem[]> {
   const { data } = await api.get<GradeListItem[]>('', { params: filtro });

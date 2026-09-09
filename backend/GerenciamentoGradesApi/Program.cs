@@ -1,4 +1,5 @@
 using GerenciamentoGradesApi.Data;
+using GerenciamentoGradesApi.Middleware;
 using GerenciamentoGradesApi.Repositories;
 using GerenciamentoGradesApi.Repositories.Interfaces;
 
@@ -17,6 +18,7 @@ builder.Services.AddCors(options => options.AddPolicy("Frontend", policy => poli
 
 builder.Services.AddSingleton<IDbConnectionFactory, SqlConnectionFactory>();
 builder.Services.AddScoped<IGradeRepository, GradeRepository>();
+builder.Services.AddScoped<IAuditoriaRepository, AuditoriaRepository>();
 
 var app = builder.Build();
 
@@ -34,6 +36,10 @@ if (app.Environment.IsDevelopment())
 app.UseCors("Frontend");
 
 app.UseAuthorization();
+
+// Stand-in enquanto não existe login/SSO: exige e valida a matrícula do
+// usuário (cabeçalho X-Matricula) em toda escrita sob /api/grades.
+app.UseMiddleware<MatriculaMiddleware>();
 
 app.MapControllers();
 

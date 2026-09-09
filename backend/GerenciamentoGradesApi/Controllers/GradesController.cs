@@ -1,6 +1,7 @@
 using ClosedXML.Excel;
 using GerenciamentoGradesApi.Dtos.Requests;
 using GerenciamentoGradesApi.Dtos.Responses;
+using GerenciamentoGradesApi.Middleware;
 using GerenciamentoGradesApi.Repositories.Interfaces;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
@@ -72,7 +73,7 @@ public class GradesController : ControllerBase
         var invalidos = skus.Where(s => !existentes.Contains(s)).ToList();
 
         if (existentes.Count > 0)
-            await _gradeRepository.VincularSkusAsync(codigo, existentes);
+            await _gradeRepository.VincularSkusAsync(codigo, existentes, HttpContext.ObterMatricula());
 
         var detalhe = await MontarDetalheAsync(codigo);
         return Ok(new AtualizarSkusResponse { Grade = detalhe!, SkusInvalidos = invalidos });
@@ -90,7 +91,7 @@ public class GradesController : ControllerBase
         var invalidos = skus.Where(s => !vinculados.Contains(s)).ToList();
 
         if (vinculados.Count > 0)
-            await _gradeRepository.DesvincularSkusAsync(codigo, vinculados);
+            await _gradeRepository.DesvincularSkusAsync(codigo, vinculados, HttpContext.ObterMatricula());
 
         var detalhe = await MontarDetalheAsync(codigo);
         return Ok(new AtualizarSkusResponse { Grade = detalhe!, SkusInvalidos = invalidos });
@@ -121,7 +122,7 @@ public class GradesController : ControllerBase
 
         try
         {
-            var codigo = await _gradeRepository.CriarAsync(nome, sigla);
+            var codigo = await _gradeRepository.CriarAsync(nome, sigla, HttpContext.ObterMatricula());
             var resposta = new GradeResponse { Codigo = codigo, Nome = nome, Sigla = sigla };
 
             return CreatedAtAction(nameof(ObterDetalhe), new { codigo }, resposta);
@@ -140,7 +141,7 @@ public class GradesController : ControllerBase
 
         try
         {
-            var atualizado = await _gradeRepository.AtualizarAsync(codigo, nome, sigla);
+            var atualizado = await _gradeRepository.AtualizarAsync(codigo, nome, sigla, HttpContext.ObterMatricula());
             if (!atualizado)
                 return NotFound(new { mensagem = $"Grade {codigo} não encontrada." });
 
@@ -155,7 +156,7 @@ public class GradesController : ControllerBase
     [HttpDelete("{codigo:int}")]
     public async Task<IActionResult> Excluir(int codigo)
     {
-        var excluido = await _gradeRepository.ExcluirAsync(codigo);
+        var excluido = await _gradeRepository.ExcluirAsync(codigo, HttpContext.ObterMatricula());
         if (!excluido)
             return NotFound(new { mensagem = $"Grade {codigo} não encontrada." });
 
@@ -224,6 +225,7 @@ public class GradesController : ControllerBase
         if (linhas.Count == 0)
             return BadRequest(new { mensagem = "A planilha não contém dados." });
 
+        var matricula = HttpContext.ObterMatricula();
         var erros = new List<ErroLinhaResponse>();
         var linhasValidas = new List<LinhaImportacao>();
 
@@ -275,10 +277,10 @@ public class GradesController : ControllerBase
         foreach (var (gradeNome, itens) in itensPorGrade)
         {
             var codigoGrade = await _gradeRepository.ObterCodigoPorNomeAsync(gradeNome)
-                ?? await _gradeRepository.CriarAsync(gradeNome, itens[0].Sigla);
+                ?? await _gradeRepository.CriarAsync(gradeNome, itens[0].Sigla, matricula);
 
             var skus = itens.Select(i => i.Sku).Distinct().ToList();
-            await _gradeRepository.VincularSkusAsync(codigoGrade, skus);
+            await _gradeRepository.VincularSkusAsync(codigoGrade, skus, matricula);
             sucesso += itens.Count;
         }
 
@@ -311,6 +313,7 @@ public class GradesController : ControllerBase
         if (linhas.Count == 0)
             return BadRequest(new { mensagem = "A planilha não contém dados." });
 
+        var matricula = HttpContext.ObterMatricula();
         var erros = new List<ErroLinhaResponse>();
         var itensPorGrade = new Dictionary<int, List<LinhaExclusao>>();
 
@@ -356,7 +359,7 @@ public class GradesController : ControllerBase
 
             if (vinculados.Count > 0)
             {
-                await _gradeRepository.DesvincularSkusAsync(codigoGrade, vinculados);
+                await _gradeRepository.DesvincularSkusAsync(codigoGrade, vinculados, matricula);
                 sucesso += itens.Count(i => vinculados.Contains(i.Sku));
             }
         }

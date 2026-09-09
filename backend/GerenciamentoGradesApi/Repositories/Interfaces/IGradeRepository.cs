@@ -14,17 +14,17 @@ public interface IGradeRepository
 
     Task<int?> ObterCodigoPorNomeAsync(string nome);
 
-    Task<int> CriarAsync(string nome, string sigla);
+    Task<int> CriarAsync(string nome, string sigla, string matricula);
 
-    Task<bool> AtualizarAsync(int codigo, string nome, string sigla);
+    Task<bool> AtualizarAsync(int codigo, string nome, string sigla, string matricula);
 
-    Task<bool> ExcluirAsync(int codigo);
+    Task<bool> ExcluirAsync(int codigo, string matricula);
 
     Task<HashSet<string>> FiltrarSkusExistentesAsync(IEnumerable<string> skus);
 
-    Task VincularSkusAsync(int codigo, IEnumerable<string> skus);
+    Task VincularSkusAsync(int codigo, IEnumerable<string> skus, string matricula);
 
     Task<HashSet<string>> FiltrarSkusVinculadosAsync(int codigo, IEnumerable<string> skus);
 
-    Task DesvincularSkusAsync(int codigo, IEnumerable<string> skus);
+    Task DesvincularSkusAsync(int codigo, IEnumerable<string> skus, string matricula);
 }

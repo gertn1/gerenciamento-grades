@@ -1,8 +1,20 @@
+import { IdcardOutlined } from '@ant-design/icons';
 import { Layout, Space, Typography } from 'antd';
+import { useEffect, useState } from 'react';
+import { esquecerMatricula, garantirMatricula, obterMatriculaAtual, ouvirMatricula } from '../auth/matricula';
 
 const { Text } = Typography;
 
 export function AppHeader() {
+  const [matricula, setMatricula] = useState(obterMatriculaAtual());
+
+  useEffect(() => ouvirMatricula(setMatricula), []);
+
+  function handleTrocarMatricula() {
+    esquecerMatricula();
+    garantirMatricula();
+  }
+
   return (
     <Layout.Header
       style={{
@@ -40,7 +52,19 @@ export function AppHeader() {
         Preços WEB
       </Text>
 
-      <Text style={{ color: 'rgba(255,255,255,0.85)' }}>Usuário logado</Text>
+      <Space size={6}>
+        <IdcardOutlined style={{ color: 'rgba(255,255,255,0.85)' }} />
+        <Text style={{ color: 'rgba(255,255,255,0.85)' }}>
+          {matricula ? `Matrícula ${matricula}` : 'Identificação pendente'}
+        </Text>
+        <Text
+          underline
+          onClick={handleTrocarMatricula}
+          style={{ color: 'rgba(255,255,255,0.85)', cursor: 'pointer', marginLeft: 4 }}
+        >
+          trocar
+        </Text>
+      </Space>
     </Layout.Header>
   );
 }
