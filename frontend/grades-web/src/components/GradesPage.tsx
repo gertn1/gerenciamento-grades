@@ -17,7 +17,7 @@ import {
   urlModeloExclusaoMassivaSkus,
   urlModeloImportacaoMassiva,
 } from '../api/gradesApi';
-import type { GradeListItem } from '../types/grade';
+import type { Grade, GradeListItem } from '../types/grade';
 import { AppHeader } from './AppHeader';
 import { BulkOperationModal } from './BulkOperationModal';
 import { GradeDeleteModal } from './GradeDeleteModal';
@@ -33,13 +33,16 @@ export function GradesPage() {
   const [filtroNome, setFiltroNome] = useState('');
 
   const [formAberto, setFormAberto] = useState(false);
-  const [gradeEmEdicao, setGradeEmEdicao] = useState<GradeListItem | null>(null);
+  const [gradeEmEdicao, setGradeEmEdicao] = useState<Grade | null>(null);
 
   const [detalheAberto, setDetalheAberto] = useState(false);
   const [codigoDetalhe, setCodigoDetalhe] = useState<number | null>(null);
+  const [detalheRefreshKey, setDetalheRefreshKey] = useState(0);
 
   const [exclusaoAberta, setExclusaoAberta] = useState(false);
-  const [gradeParaExcluir, setGradeParaExcluir] = useState<GradeListItem | null>(null);
+  const [gradeParaExcluir, setGradeParaExcluir] = useState<{ codigo: number; nome: string; qtdSkus: number } | null>(
+    null,
+  );
 
   const [criacaoMassivaAberta, setCriacaoMassivaAberta] = useState(false);
   const [exclusaoMassivaAberta, setExclusaoMassivaAberta] = useState(false);
@@ -200,10 +203,24 @@ export function GradesPage() {
         onSaved={() => {
           setFormAberto(false);
           carregarGrades();
+          if (detalheAberto) setDetalheRefreshKey((chave) => chave + 1);
         }}
       />
 
-      <GradeDetailModal open={detalheAberto} codigo={codigoDetalhe} onClose={() => setDetalheAberto(false)} />
+      <GradeDetailModal
+        open={detalheAberto}
+        codigo={codigoDetalhe}
+        refreshKey={detalheRefreshKey}
+        onClose={() => setDetalheAberto(false)}
+        onEditarGrade={(grade) => {
+          setGradeEmEdicao(grade);
+          setFormAberto(true);
+        }}
+        onExcluirGrade={(grade) => {
+          setGradeParaExcluir({ codigo: grade.codigo, nome: grade.nome, qtdSkus: grade.skus.length });
+          setExclusaoAberta(true);
+        }}
+      />
 
       <GradeDeleteModal
         open={exclusaoAberta}
@@ -211,6 +228,7 @@ export function GradesPage() {
         onClose={() => setExclusaoAberta(false)}
         onDeleted={() => {
           setExclusaoAberta(false);
+          setDetalheAberto(false);
           carregarGrades();
         }}
       />

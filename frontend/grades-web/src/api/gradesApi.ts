@@ -1,5 +1,13 @@
 import axios from 'axios';
-import type { Grade, GradeDetalhe, GradeFormValues, GradeListItem, ImportacaoResult } from '../types/grade';
+import type {
+  AtualizarSkusResult,
+  Grade,
+  GradeDetalhe,
+  GradeFormValues,
+  GradeListItem,
+  ImportacaoResult,
+  SkuResumo,
+} from '../types/grade';
 
 export const baseURL = import.meta.env.VITE_API_GRADES_URL ?? 'http://localhost:5244/api/grades';
 
@@ -27,6 +35,21 @@ export async function atualizarGrade(codigo: number, valores: GradeFormValues): 
 
 export async function excluirGrade(codigo: number): Promise<void> {
   await api.delete(`/${codigo}`);
+}
+
+export async function buscarSkusDisponiveis(codigo: number, termo: string): Promise<SkuResumo[]> {
+  const { data } = await api.get<SkuResumo[]>(`/${codigo}/skus-disponiveis`, { params: { termo } });
+  return data;
+}
+
+export async function adicionarSkus(codigo: number, skus: string[]): Promise<AtualizarSkusResult> {
+  const { data } = await api.post<AtualizarSkusResult>(`/${codigo}/skus`, { skus });
+  return data;
+}
+
+export async function removerSkus(codigo: number, skus: string[]): Promise<AtualizarSkusResult> {
+  const { data } = await api.post<AtualizarSkusResult>(`/${codigo}/skus/remover`, { skus });
+  return data;
 }
 
 export function urlModeloImportacaoMassiva(): string {

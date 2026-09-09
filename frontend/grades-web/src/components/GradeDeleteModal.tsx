@@ -2,11 +2,16 @@ import { DeleteOutlined } from '@ant-design/icons';
 import { Modal, message } from 'antd';
 import { useState } from 'react';
 import { excluirGrade, extrairMensagemErro } from '../api/gradesApi';
-import type { GradeListItem } from '../types/grade';
+
+interface GradeParaExclusao {
+  codigo: number;
+  nome: string;
+  qtdSkus: number;
+}
 
 interface GradeDeleteModalProps {
   open: boolean;
-  grade: GradeListItem | null;
+  grade: GradeParaExclusao | null;
   onClose: () => void;
   onDeleted: () => void;
 }

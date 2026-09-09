@@ -1,5 +1,5 @@
 import { Form, Input, Modal, message } from 'antd';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { atualizarGrade, criarGrade, extrairMensagemErro } from '../api/gradesApi';
 import type { Grade, GradeFormValues } from '../types/grade';
 
@@ -14,12 +14,6 @@ export function GradeFormModal({ open, grade, onClose, onSaved }: GradeFormModal
   const [form] = Form.useForm<GradeFormValues>();
   const [salvando, setSalvando] = useState(false);
   const editando = Boolean(grade);
-
-  useEffect(() => {
-    if (open) {
-      form.setFieldsValue({ nome: grade?.nome ?? '', sigla: grade?.sigla ?? '' });
-    }
-  }, [open, grade, form]);
 
   async function handleSalvar() {
     try {
@@ -56,7 +50,12 @@ export function GradeFormModal({ open, grade, onClose, onSaved }: GradeFormModal
     >
       <p style={{ color: 'rgba(0,0,0,0.45)', marginTop: -8 }}>Preencha os campos obrigatórios</p>
 
-      <Form form={form} layout="vertical" preserve={false}>
+      <Form
+        form={form}
+        layout="vertical"
+        preserve={false}
+        initialValues={{ nome: grade?.nome ?? '', sigla: grade?.sigla ?? '' }}
+      >
         <Form.Item label="Código sequencial">
           <Input value={grade?.codigo ? String(grade.codigo) : ''} placeholder="— gerado automaticamente —" disabled readOnly />
         </Form.Item>

@@ -44,17 +44,34 @@ public class GradeRepository : IGradeRepository
         return await connection.QuerySingleOrDefaultAsync<Grade>(sql, new { Codigo = codigo });
     }
 
-    public async Task<IEnumerable<string>> ListarSkusPorGradeAsync(int codigo)
+    public async Task<IEnumerable<SkuResumo>> ListarSkusPorGradeAsync(int codigo)
     {
         const string sql = """
-            SELECT PRME_CD_PRODUTO
+            SELECT PRME_CD_PRODUTO AS Codigo, PRME_TX_DESCRICAO1 AS Descricao
             FROM PRODUTO_MESTRE WITH (NOLOCK)
             WHERE CODIGO_GRADE_PRECOS = @Codigo
             ORDER BY PRME_CD_PRODUTO
             """;
 
         using var connection = _connectionFactory.CreateConnection();
-        return await connection.QueryAsync<string>(sql, new { Codigo = codigo });
+        return await connection.QueryAsync<SkuResumo>(sql, new { Codigo = codigo });
+    }
+
+    public async Task<IEnumerable<SkuResumo>> BuscarSkusDisponiveisAsync(string termo, int gradeCodigoAtual)
+    {
+        const string sql = """
+            SELECT TOP 50 PRME_CD_PRODUTO AS Codigo, PRME_TX_DESCRICAO1 AS Descricao
+            FROM PRODUTO_MESTRE WITH (NOLOCK)
+            WHERE (CODIGO_GRADE_PRECOS IS NULL OR CODIGO_GRADE_PRECOS <> @GradeCodigoAtual)
+              AND (
+                    CONVERT(varchar(20), PRME_CD_PRODUTO) LIKE @Termo + '%'
+                    OR PRME_TX_DESCRICAO1 LIKE '%' + @Termo + '%'
+                  )
+            ORDER BY PRME_TX_DESCRICAO1
+            """;
+
+        using var connection = _connectionFactory.CreateConnection();
+        return await connection.QueryAsync<SkuResumo>(sql, new { Termo = termo, GradeCodigoAtual = gradeCodigoAtual });
     }
 
     public async Task<int?> ObterCodigoPorNomeAsync(string nome)

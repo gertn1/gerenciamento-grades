@@ -8,8 +8,18 @@ export interface GradeListItem extends Grade {
   qtdSkus: number;
 }
 
+export interface SkuResumo {
+  codigo: string;
+  descricao: string;
+}
+
 export interface GradeDetalhe extends Grade {
-  skus: string[];
+  skus: SkuResumo[];
+}
+
+export interface AtualizarSkusResult {
+  grade: GradeDetalhe;
+  skusInvalidos: string[];
 }
 
 export interface ErroLinha {

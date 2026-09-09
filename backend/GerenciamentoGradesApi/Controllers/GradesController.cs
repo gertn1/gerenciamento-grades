@@ -41,19 +41,76 @@ public class GradesController : ControllerBase
     [HttpGet("{codigo:int}")]
     public async Task<ActionResult<GradeDetalheResponse>> ObterDetalhe(int codigo)
     {
+        var detalhe = await MontarDetalheAsync(codigo);
+        if (detalhe is null)
+            return NotFound(new { mensagem = $"Grade {codigo} não encontrada." });
+
+        return Ok(detalhe);
+    }
+
+    [HttpGet("{codigo:int}/skus-disponiveis")]
+    public async Task<ActionResult<IEnumerable<SkuResumoResponse>>> BuscarSkusDisponiveis(int codigo, [FromQuery] string? termo)
+    {
         var grade = await _gradeRepository.ObterPorCodigoAsync(codigo);
         if (grade is null)
             return NotFound(new { mensagem = $"Grade {codigo} não encontrada." });
 
+        var skus = await _gradeRepository.BuscarSkusDisponiveisAsync(termo?.Trim() ?? string.Empty, codigo);
+
+        return Ok(skus.Select(s => new SkuResumoResponse { Codigo = s.Codigo, Descricao = s.Descricao }));
+    }
+
+    [HttpPost("{codigo:int}/skus")]
+    public async Task<ActionResult<AtualizarSkusResponse>> AdicionarSkus(int codigo, [FromBody] SkusRequest request)
+    {
+        var grade = await _gradeRepository.ObterPorCodigoAsync(codigo);
+        if (grade is null)
+            return NotFound(new { mensagem = $"Grade {codigo} não encontrada." });
+
+        var skus = request.Skus.Distinct().ToList();
+        var existentes = await _gradeRepository.FiltrarSkusExistentesAsync(skus);
+        var invalidos = skus.Where(s => !existentes.Contains(s)).ToList();
+
+        if (existentes.Count > 0)
+            await _gradeRepository.VincularSkusAsync(codigo, existentes);
+
+        var detalhe = await MontarDetalheAsync(codigo);
+        return Ok(new AtualizarSkusResponse { Grade = detalhe!, SkusInvalidos = invalidos });
+    }
+
+    [HttpPost("{codigo:int}/skus/remover")]
+    public async Task<ActionResult<AtualizarSkusResponse>> RemoverSkus(int codigo, [FromBody] SkusRequest request)
+    {
+        var grade = await _gradeRepository.ObterPorCodigoAsync(codigo);
+        if (grade is null)
+            return NotFound(new { mensagem = $"Grade {codigo} não encontrada." });
+
+        var skus = request.Skus.Distinct().ToList();
+        var vinculados = await _gradeRepository.FiltrarSkusVinculadosAsync(codigo, skus);
+        var invalidos = skus.Where(s => !vinculados.Contains(s)).ToList();
+
+        if (vinculados.Count > 0)
+            await _gradeRepository.DesvincularSkusAsync(codigo, vinculados);
+
+        var detalhe = await MontarDetalheAsync(codigo);
+        return Ok(new AtualizarSkusResponse { Grade = detalhe!, SkusInvalidos = invalidos });
+    }
+
+    private async Task<GradeDetalheResponse?> MontarDetalheAsync(int codigo)
+    {
+        var grade = await _gradeRepository.ObterPorCodigoAsync(codigo);
+        if (grade is null)
+            return null;
+
         var skus = await _gradeRepository.ListarSkusPorGradeAsync(codigo);
 
-        return Ok(new GradeDetalheResponse
+        return new GradeDetalheResponse
         {
             Codigo = grade.Codigo,
             Nome = grade.Nome,
             Sigla = grade.Sigla,
-            Skus = skus.ToList()
-        });
+            Skus = skus.Select(s => new SkuResumoResponse { Codigo = s.Codigo, Descricao = s.Descricao }).ToList()
+        };
     }
 
     [HttpPost]
