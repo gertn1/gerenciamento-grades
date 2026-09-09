@@ -22,6 +22,8 @@ public interface IGradeRepository
 
     Task<HashSet<string>> FiltrarSkusExistentesAsync(IEnumerable<string> skus);
 
+    Task<Dictionary<string, SkuVinculo>> ObterVinculoAtualAsync(IEnumerable<string> skus);
+
     Task VincularSkusAsync(int codigo, IEnumerable<string> skus, string matricula);
 
     Task<HashSet<string>> FiltrarSkusVinculadosAsync(int codigo, IEnumerable<string> skus);

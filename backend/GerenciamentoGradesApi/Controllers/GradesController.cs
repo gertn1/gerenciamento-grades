@@ -70,13 +70,43 @@ public class GradesController : ControllerBase
 
         var skus = request.Skus.Distinct().ToList();
         var existentes = await _gradeRepository.FiltrarSkusExistentesAsync(skus);
-        var invalidos = skus.Where(s => !existentes.Contains(s)).ToList();
 
-        if (existentes.Count > 0)
-            await _gradeRepository.VincularSkusAsync(codigo, existentes, HttpContext.ObterMatricula());
+        var rejeitados = skus
+            .Where(s => !existentes.Contains(s))
+            .Select(s => new SkuRejeitadoResponse { Sku = s, Mensagem = $"SKU {s} não encontrado." })
+            .ToList();
+
+        // Regra de negócio: um SKU só pode ser vinculado se estiver livre (sem
+        // grade) ou já pertencer à própria grade que está sendo editada — não
+        // pode "roubar" um SKU de outra grade por aqui.
+        var vinculos = await _gradeRepository.ObterVinculoAtualAsync(existentes);
+        var paraVincular = new List<string>();
+
+        foreach (var sku in existentes)
+        {
+            var vinculo = vinculos.GetValueOrDefault(sku);
+
+            if (vinculo?.CodigoGrade is int codigoAtual && codigoAtual != codigo)
+            {
+                rejeitados.Add(new SkuRejeitadoResponse
+                {
+                    Sku = sku,
+                    Mensagem = $"SKU {sku} já está vinculado à grade {codigoAtual} - {vinculo.NomeGrade}."
+                });
+                continue;
+            }
+
+            if (vinculo?.CodigoGrade == codigo)
+                continue; // já pertence a esta grade — nada a fazer, mas não é erro
+
+            paraVincular.Add(sku);
+        }
+
+        if (paraVincular.Count > 0)
+            await _gradeRepository.VincularSkusAsync(codigo, paraVincular, HttpContext.ObterMatricula());
 
         var detalhe = await MontarDetalheAsync(codigo);
-        return Ok(new AtualizarSkusResponse { Grade = detalhe!, SkusInvalidos = invalidos });
+        return Ok(new AtualizarSkusResponse { Grade = detalhe!, SkusRejeitados = rejeitados });
     }
 
     [HttpPost("{codigo:int}/skus/remover")]
@@ -88,13 +118,17 @@ public class GradesController : ControllerBase
 
         var skus = request.Skus.Distinct().ToList();
         var vinculados = await _gradeRepository.FiltrarSkusVinculadosAsync(codigo, skus);
-        var invalidos = skus.Where(s => !vinculados.Contains(s)).ToList();
+
+        var rejeitados = skus
+            .Where(s => !vinculados.Contains(s))
+            .Select(s => new SkuRejeitadoResponse { Sku = s, Mensagem = $"SKU {s} não está vinculado a esta grade." })
+            .ToList();
 
         if (vinculados.Count > 0)
             await _gradeRepository.DesvincularSkusAsync(codigo, vinculados, HttpContext.ObterMatricula());
 
         var detalhe = await MontarDetalheAsync(codigo);
-        return Ok(new AtualizarSkusResponse { Grade = detalhe!, SkusInvalidos = invalidos });
+        return Ok(new AtualizarSkusResponse { Grade = detalhe!, SkusRejeitados = rejeitados });
     }
 
     private async Task<GradeDetalheResponse?> MontarDetalheAsync(int codigo)
@@ -273,15 +307,71 @@ public class GradesController : ControllerBase
             lista.Add(linha);
         }
 
+        // Regra de negócio: um SKU só pode ser vinculado se estiver livre ou já
+        // pertencer à própria grade de destino da linha — nunca "roubado" de
+        // outra grade pela importação. `vinculoEfetivo` começa como o estado
+        // atual do banco e é atualizado a cada grupo processado, para também
+        // pegar o caso de duas linhas do MESMO arquivo disputando o mesmo SKU
+        // para grades diferentes.
+        var vinculos = await _gradeRepository.ObterVinculoAtualAsync(skusExistentes);
+        var vinculoEfetivo = vinculos.ToDictionary(kv => kv.Key, kv => kv.Value.CodigoGrade, StringComparer.OrdinalIgnoreCase);
+        var nomesGradeCache = new Dictionary<int, string?>();
+
+        async Task<string?> ObterNomeGradeAsync(int codigoGrade)
+        {
+            if (!nomesGradeCache.TryGetValue(codigoGrade, out var nome))
+            {
+                var grade = await _gradeRepository.ObterPorCodigoAsync(codigoGrade);
+                nome = grade?.Nome;
+                nomesGradeCache[codigoGrade] = nome;
+            }
+
+            return nome;
+        }
+
         var sucesso = 0;
         foreach (var (gradeNome, itens) in itensPorGrade)
         {
             var codigoGrade = await _gradeRepository.ObterCodigoPorNomeAsync(gradeNome)
                 ?? await _gradeRepository.CriarAsync(gradeNome, itens[0].Sigla, matricula);
 
-            var skus = itens.Select(i => i.Sku).Distinct().ToList();
-            await _gradeRepository.VincularSkusAsync(codigoGrade, skus, matricula);
-            sucesso += itens.Count;
+            var bloqueados = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var paraVincular = new List<string>();
+
+            foreach (var sku in itens.Select(i => i.Sku).Distinct())
+            {
+                vinculoEfetivo.TryGetValue(sku, out var codigoAtual);
+
+                if (codigoAtual is int codigo && codigo != codigoGrade)
+                    bloqueados.Add(sku);
+                else if (codigoAtual != codigoGrade)
+                    paraVincular.Add(sku);
+            }
+
+            if (paraVincular.Count > 0)
+            {
+                await _gradeRepository.VincularSkusAsync(codigoGrade, paraVincular, matricula);
+                foreach (var sku in paraVincular)
+                    vinculoEfetivo[sku] = codigoGrade;
+            }
+
+            foreach (var linha in itens)
+            {
+                if (!bloqueados.Contains(linha.Sku))
+                {
+                    sucesso++;
+                    continue;
+                }
+
+                var codigoBloqueio = vinculoEfetivo.GetValueOrDefault(linha.Sku);
+                var nomeBloqueio = codigoBloqueio is int cb ? await ObterNomeGradeAsync(cb) : null;
+
+                erros.Add(new ErroLinhaResponse
+                {
+                    Linha = linha.Linha,
+                    Mensagem = $"SKU {linha.Sku} já está vinculado à grade {codigoBloqueio} - {nomeBloqueio}."
+                });
+            }
         }
 
         return Ok(new ImportacaoResultResponse

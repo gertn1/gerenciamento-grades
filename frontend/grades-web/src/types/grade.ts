@@ -17,9 +17,14 @@ export interface GradeDetalhe extends Grade {
   skus: SkuResumo[];
 }
 
+export interface SkuRejeitado {
+  sku: string;
+  mensagem: string;
+}
+
 export interface AtualizarSkusResult {
   grade: GradeDetalhe;
-  skusInvalidos: string[];
+  skusRejeitados: SkuRejeitado[];
 }
 
 export interface ErroLinha {

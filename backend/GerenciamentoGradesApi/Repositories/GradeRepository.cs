@@ -235,6 +235,28 @@ public class GradeRepository : IGradeRepository
         return encontrados;
     }
 
+    public async Task<Dictionary<string, SkuVinculo>> ObterVinculoAtualAsync(IEnumerable<string> skus)
+    {
+        const string sql = """
+            SELECT pm.PRME_CD_PRODUTO AS Sku, pm.CODIGO_GRADE_PRECOS AS CodigoGrade, g.NOME AS NomeGrade
+            FROM PRODUTO_MESTRE pm WITH (NOLOCK)
+            LEFT JOIN grade_precos g WITH (NOLOCK) ON g.CODIGO = pm.CODIGO_GRADE_PRECOS
+            WHERE pm.PRME_CD_PRODUTO IN @Skus
+            """;
+
+        var resultado = new Dictionary<string, SkuVinculo>(StringComparer.OrdinalIgnoreCase);
+        using var connection = _connectionFactory.CreateConnection();
+
+        foreach (var lote in skus.Distinct().Chunk(TamanhoLote))
+        {
+            var linhas = await connection.QueryAsync<SkuVinculo>(sql, new { Skus = lote });
+            foreach (var linha in linhas)
+                resultado[linha.Sku] = linha;
+        }
+
+        return resultado;
+    }
+
     public async Task VincularSkusAsync(int codigo, IEnumerable<string> skus, string matricula)
     {
         const string selecionarAnteriores = """

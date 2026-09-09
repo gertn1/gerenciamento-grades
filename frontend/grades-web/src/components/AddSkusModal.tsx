@@ -51,11 +51,20 @@ export function AddSkusModal({ open, gradeCodigo, onClose, onAdicionados }: AddS
       setSalvando(true);
       const resultado = await adicionarSkus(gradeCodigo, selecionados);
 
-      if (resultado.skusInvalidos.length > 0) {
-        message.warning(`${resultado.skusInvalidos.length} SKU(s) não encontrado(s): ${resultado.skusInvalidos.join(', ')}`);
+      if (resultado.skusRejeitados.length > 0) {
+        Modal.warning({
+          title: `${resultado.skusRejeitados.length} SKU(s) não adicionado(s)`,
+          content: (
+            <ul style={{ paddingLeft: 20, margin: 0 }}>
+              {resultado.skusRejeitados.map((rejeitado) => (
+                <li key={rejeitado.sku}>{rejeitado.mensagem}</li>
+              ))}
+            </ul>
+          ),
+        });
       }
 
-      const adicionados = selecionados.length - resultado.skusInvalidos.length;
+      const adicionados = selecionados.length - resultado.skusRejeitados.length;
       if (adicionados > 0) {
         message.success(`${adicionados} SKU(s) adicionado(s) à grade.`);
       }
