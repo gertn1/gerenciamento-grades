@@ -2,6 +2,8 @@ using GerenciamentoGradesApi.Data;
 using GerenciamentoGradesApi.Middleware;
 using GerenciamentoGradesApi.Repositories;
 using GerenciamentoGradesApi.Repositories.Interfaces;
+using GerenciamentoGradesApi.Services;
+using GerenciamentoGradesApi.Services.Interfaces;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -19,6 +21,8 @@ builder.Services.AddCors(options => options.AddPolicy("Frontend", policy => poli
 builder.Services.AddSingleton<IDbConnectionFactory, SqlConnectionFactory>();
 builder.Services.AddScoped<IGradeRepository, GradeRepository>();
 builder.Services.AddScoped<IAuditoriaRepository, AuditoriaRepository>();
+builder.Services.AddScoped<IGradeService, GradeService>();
+builder.Services.AddScoped<IPlanilhaGradeService, PlanilhaGradeService>();
 
 var app = builder.Build();
 

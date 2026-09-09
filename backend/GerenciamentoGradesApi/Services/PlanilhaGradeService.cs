@@ -1,0 +1,345 @@
+using ClosedXML.Excel;
+using GerenciamentoGradesApi.Dtos.Responses;
+using GerenciamentoGradesApi.Repositories.Interfaces;
+using GerenciamentoGradesApi.Services.Interfaces;
+using GerenciamentoGradesApi.Services.Resultados;
+
+namespace GerenciamentoGradesApi.Services;
+
+public class PlanilhaGradeService : IPlanilhaGradeService
+{
+    private readonly IGradeRepository _gradeRepository;
+
+    public PlanilhaGradeService(IGradeRepository gradeRepository)
+    {
+        _gradeRepository = gradeRepository;
+    }
+
+    public byte[] GerarModeloImportacaoMassiva()
+    {
+        using var workbook = new XLWorkbook();
+        var planilha = workbook.Worksheets.Add("Grades");
+
+        planilha.Cell(1, 1).Value = "SKU";
+        planilha.Cell(1, 2).Value = "GRADE";
+        planilha.Cell(1, 3).Value = "SIGLA";
+        planilha.Range(1, 1, 1, 3).Style.Font.Bold = true;
+        planilha.Columns().AdjustToContents();
+
+        using var stream = new MemoryStream();
+        workbook.SaveAs(stream);
+        return stream.ToArray();
+    }
+
+    public byte[] GerarModeloExclusaoMassivaSkus()
+    {
+        using var workbook = new XLWorkbook();
+        var planilha = workbook.Worksheets.Add("SKUs");
+
+        planilha.Cell(1, 1).Value = "GRADE";
+        planilha.Cell(1, 2).Value = "SKU";
+        planilha.Range(1, 1, 1, 2).Style.Font.Bold = true;
+        planilha.Columns().AdjustToContents();
+
+        using var stream = new MemoryStream();
+        workbook.SaveAs(stream);
+        return stream.ToArray();
+    }
+
+    public async Task<ResultadoOperacao<ImportacaoResultResponse>> ImportarAsync(Stream conteudoArquivo, string nomeArquivo, string matricula)
+    {
+        var erroExtensao = ValidarExtensao(nomeArquivo);
+        if (erroExtensao is not null)
+            return ResultadoOperacao<ImportacaoResultResponse>.EntradaInvalida(erroExtensao);
+
+        List<LinhaImportacao> linhas;
+        try
+        {
+            linhas = LerPlanilhaImportacao(conteudoArquivo);
+        }
+        catch (Exception ex)
+        {
+            return ResultadoOperacao<ImportacaoResultResponse>.EntradaInvalida($"Não foi possível ler a planilha: {ex.Message}");
+        }
+
+        if (linhas.Count == 0)
+            return ResultadoOperacao<ImportacaoResultResponse>.EntradaInvalida("A planilha não contém dados.");
+
+        var erros = new List<ErroLinhaResponse>();
+        var linhasValidas = new List<LinhaImportacao>();
+
+        foreach (var linha in linhas)
+        {
+            if (string.IsNullOrWhiteSpace(linha.Sku) || string.IsNullOrWhiteSpace(linha.GradeNome) || string.IsNullOrWhiteSpace(linha.Sigla))
+            {
+                erros.Add(new ErroLinhaResponse { Linha = linha.Linha, Mensagem = "SKU, GRADE e SIGLA são obrigatórios." });
+                continue;
+            }
+
+            if (linha.GradeNome.Length > 80)
+            {
+                erros.Add(new ErroLinhaResponse { Linha = linha.Linha, Mensagem = "GRADE deve ter no máximo 80 caracteres." });
+                continue;
+            }
+
+            if (linha.Sigla.Length > 15)
+            {
+                erros.Add(new ErroLinhaResponse { Linha = linha.Linha, Mensagem = "SIGLA deve ter no máximo 15 caracteres." });
+                continue;
+            }
+
+            linhasValidas.Add(linha);
+        }
+
+        var skusExistentes = await _gradeRepository.FiltrarSkusExistentesAsync(linhasValidas.Select(l => l.Sku));
+
+        var itensPorGrade = new Dictionary<string, List<LinhaImportacao>>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var linha in linhasValidas)
+        {
+            if (!skusExistentes.Contains(linha.Sku))
+            {
+                erros.Add(new ErroLinhaResponse { Linha = linha.Linha, Mensagem = $"SKU {linha.Sku} não encontrado." });
+                continue;
+            }
+
+            if (!itensPorGrade.TryGetValue(linha.GradeNome, out var lista))
+            {
+                lista = [];
+                itensPorGrade[linha.GradeNome] = lista;
+            }
+
+            lista.Add(linha);
+        }
+
+        // Regra de negócio: um SKU só pode ser vinculado se estiver livre ou já
+        // pertencer à própria grade de destino da linha — nunca "roubado" de
+        // outra grade pela importação. `vinculoEfetivo` começa como o estado
+        // atual do banco e é atualizado a cada grupo processado, para também
+        // pegar o caso de duas linhas do MESMO arquivo disputando o mesmo SKU
+        // para grades diferentes.
+        var vinculos = await _gradeRepository.ObterVinculoAtualAsync(skusExistentes);
+        var vinculoEfetivo = vinculos.ToDictionary(kv => kv.Key, kv => kv.Value.CodigoGrade, StringComparer.OrdinalIgnoreCase);
+        var nomesGradeCache = new Dictionary<int, string?>();
+
+        async Task<string?> ObterNomeGradeAsync(int codigoGrade)
+        {
+            if (!nomesGradeCache.TryGetValue(codigoGrade, out var nome))
+            {
+                var grade = await _gradeRepository.ObterPorCodigoAsync(codigoGrade);
+                nome = grade?.Nome;
+                nomesGradeCache[codigoGrade] = nome;
+            }
+
+            return nome;
+        }
+
+        var sucesso = 0;
+        foreach (var (gradeNome, itens) in itensPorGrade)
+        {
+            var codigoGrade = await _gradeRepository.ObterCodigoPorNomeAsync(gradeNome)
+                ?? await _gradeRepository.CriarAsync(gradeNome, itens[0].Sigla, matricula);
+
+            var bloqueados = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var paraVincular = new List<string>();
+
+            foreach (var sku in itens.Select(i => i.Sku).Distinct())
+            {
+                vinculoEfetivo.TryGetValue(sku, out var codigoAtual);
+
+                if (codigoAtual is int codigo && codigo != codigoGrade)
+                    bloqueados.Add(sku);
+                else if (codigoAtual != codigoGrade)
+                    paraVincular.Add(sku);
+            }
+
+            if (paraVincular.Count > 0)
+            {
+                await _gradeRepository.VincularSkusAsync(codigoGrade, paraVincular, matricula);
+                foreach (var sku in paraVincular)
+                    vinculoEfetivo[sku] = codigoGrade;
+            }
+
+            foreach (var linha in itens)
+            {
+                if (!bloqueados.Contains(linha.Sku))
+                {
+                    sucesso++;
+                    continue;
+                }
+
+                var codigoBloqueio = vinculoEfetivo.GetValueOrDefault(linha.Sku);
+                var nomeBloqueio = codigoBloqueio is int cb ? await ObterNomeGradeAsync(cb) : null;
+
+                erros.Add(new ErroLinhaResponse
+                {
+                    Linha = linha.Linha,
+                    Mensagem = $"SKU {linha.Sku} já está vinculado à grade {codigoBloqueio} - {nomeBloqueio}."
+                });
+            }
+        }
+
+        var resultado = new ImportacaoResultResponse
+        {
+            TotalLinhas = linhas.Count,
+            Sucesso = sucesso,
+            Erros = erros
+        };
+
+        return ResultadoOperacao<ImportacaoResultResponse>.ComSucesso(resultado);
+    }
+
+    public async Task<ResultadoOperacao<ImportacaoResultResponse>> ExcluirSkusEmMassaAsync(Stream conteudoArquivo, string nomeArquivo, string matricula)
+    {
+        var erroExtensao = ValidarExtensao(nomeArquivo);
+        if (erroExtensao is not null)
+            return ResultadoOperacao<ImportacaoResultResponse>.EntradaInvalida(erroExtensao);
+
+        List<LinhaExclusao> linhas;
+        try
+        {
+            linhas = LerPlanilhaExclusao(conteudoArquivo);
+        }
+        catch (Exception ex)
+        {
+            return ResultadoOperacao<ImportacaoResultResponse>.EntradaInvalida($"Não foi possível ler a planilha: {ex.Message}");
+        }
+
+        if (linhas.Count == 0)
+            return ResultadoOperacao<ImportacaoResultResponse>.EntradaInvalida("A planilha não contém dados.");
+
+        var erros = new List<ErroLinhaResponse>();
+        var itensPorGrade = new Dictionary<int, List<LinhaExclusao>>();
+
+        foreach (var linha in linhas)
+        {
+            if (string.IsNullOrWhiteSpace(linha.Sku))
+            {
+                erros.Add(new ErroLinhaResponse { Linha = linha.Linha, Mensagem = "SKU é obrigatório." });
+                continue;
+            }
+
+            if (!int.TryParse(linha.Grade, out var codigoGrade))
+            {
+                erros.Add(new ErroLinhaResponse { Linha = linha.Linha, Mensagem = $"GRADE '{linha.Grade}' inválida — informe o código numérico da grade." });
+                continue;
+            }
+
+            if (!itensPorGrade.TryGetValue(codigoGrade, out var lista))
+            {
+                lista = [];
+                itensPorGrade[codigoGrade] = lista;
+            }
+
+            lista.Add(linha);
+        }
+
+        var sucesso = 0;
+        foreach (var (codigoGrade, itens) in itensPorGrade)
+        {
+            var grade = await _gradeRepository.ObterPorCodigoAsync(codigoGrade);
+            if (grade is null)
+            {
+                erros.AddRange(itens.Select(i => new ErroLinhaResponse { Linha = i.Linha, Mensagem = $"Grade {codigoGrade} não encontrada." }));
+                continue;
+            }
+
+            var skus = itens.Select(i => i.Sku).Distinct().ToList();
+            var vinculados = await _gradeRepository.FiltrarSkusVinculadosAsync(codigoGrade, skus);
+
+            erros.AddRange(itens
+                .Where(i => !vinculados.Contains(i.Sku))
+                .Select(i => new ErroLinhaResponse { Linha = i.Linha, Mensagem = $"SKU {i.Sku} não está vinculado à grade {codigoGrade}." }));
+
+            if (vinculados.Count > 0)
+            {
+                await _gradeRepository.DesvincularSkusAsync(codigoGrade, vinculados, matricula);
+                sucesso += itens.Count(i => vinculados.Contains(i.Sku));
+            }
+        }
+
+        var resultado = new ImportacaoResultResponse
+        {
+            TotalLinhas = linhas.Count,
+            Sucesso = sucesso,
+            Erros = erros
+        };
+
+        return ResultadoOperacao<ImportacaoResultResponse>.ComSucesso(resultado);
+    }
+
+    private static string? ValidarExtensao(string nomeArquivo)
+    {
+        if (!Path.GetExtension(nomeArquivo).Equals(".xlsx", StringComparison.OrdinalIgnoreCase))
+            return "Apenas arquivos .xlsx são aceitos.";
+
+        return null;
+    }
+
+    private static List<LinhaImportacao> LerPlanilhaImportacao(Stream arquivo)
+    {
+        using var workbook = new XLWorkbook(arquivo);
+        var planilha = workbook.Worksheet(1);
+        var colunas = MapearColunas(planilha, "SKU", "GRADE", "SIGLA");
+        var ultimaLinha = planilha.LastRowUsed()?.RowNumber() ?? 1;
+
+        var linhas = new List<LinhaImportacao>();
+        for (var linhaAtual = 2; linhaAtual <= ultimaLinha; linhaAtual++)
+        {
+            var sku = planilha.Cell(linhaAtual, colunas["SKU"]).GetString().Trim();
+            var grade = planilha.Cell(linhaAtual, colunas["GRADE"]).GetString().Trim();
+            var sigla = planilha.Cell(linhaAtual, colunas["SIGLA"]).GetString().Trim();
+
+            if (string.IsNullOrWhiteSpace(sku) && string.IsNullOrWhiteSpace(grade) && string.IsNullOrWhiteSpace(sigla))
+                continue;
+
+            linhas.Add(new LinhaImportacao(linhaAtual, sku, grade, sigla));
+        }
+
+        return linhas;
+    }
+
+    private static List<LinhaExclusao> LerPlanilhaExclusao(Stream arquivo)
+    {
+        using var workbook = new XLWorkbook(arquivo);
+        var planilha = workbook.Worksheet(1);
+        var colunas = MapearColunas(planilha, "GRADE", "SKU");
+        var ultimaLinha = planilha.LastRowUsed()?.RowNumber() ?? 1;
+
+        var linhas = new List<LinhaExclusao>();
+        for (var linhaAtual = 2; linhaAtual <= ultimaLinha; linhaAtual++)
+        {
+            var grade = planilha.Cell(linhaAtual, colunas["GRADE"]).GetString().Trim();
+            var sku = planilha.Cell(linhaAtual, colunas["SKU"]).GetString().Trim();
+
+            if (string.IsNullOrWhiteSpace(grade) && string.IsNullOrWhiteSpace(sku))
+                continue;
+
+            linhas.Add(new LinhaExclusao(linhaAtual, grade, sku));
+        }
+
+        return linhas;
+    }
+
+    private static Dictionary<string, int> MapearColunas(IXLWorksheet planilha, params string[] colunasEsperadas)
+    {
+        var colunas = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var celula in planilha.Row(1).CellsUsed())
+        {
+            var nome = celula.GetString().Trim();
+            if (!string.IsNullOrEmpty(nome))
+                colunas[nome] = celula.Address.ColumnNumber;
+        }
+
+        var faltantes = colunasEsperadas.Where(c => !colunas.ContainsKey(c)).ToList();
+        if (faltantes.Count > 0)
+            throw new InvalidOperationException($"Coluna(s) obrigatória(s) não encontrada(s): {string.Join(", ", faltantes)}.");
+
+        return colunas;
+    }
+
+    private sealed record LinhaImportacao(int Linha, string Sku, string GradeNome, string Sigla);
+
+    private sealed record LinhaExclusao(int Linha, string Grade, string Sku);
+}
