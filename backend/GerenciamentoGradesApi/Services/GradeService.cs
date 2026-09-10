@@ -4,16 +4,11 @@ using GerenciamentoGradesApi.Models;
 using GerenciamentoGradesApi.Repositories.Interfaces;
 using GerenciamentoGradesApi.Services.Interfaces;
 using GerenciamentoGradesApi.Services.Resultados;
-using Microsoft.Data.SqlClient;
 
 namespace GerenciamentoGradesApi.Services;
 
 public class GradeService : IGradeService
 {
-    // 2627 = violação de PK/índice único; 2601 = violação de índice único não-clusterizado.
-    private const int SqlErroViolacaoUnicidade = 2627;
-    private const int SqlErroIndiceUnico = 2601;
-
     private readonly IGradeRepository _gradeRepository;
 
     public GradeService(IGradeRepository gradeRepository)
@@ -66,15 +61,12 @@ public class GradeService : IGradeService
         var nome = request.Nome.Trim();
         var sigla = request.Sigla.Trim();
 
-        try
-        {
-            var codigo = await _gradeRepository.CriarAsync(nome, sigla, matricula);
-            return ResultadoOperacao<GradeResponse>.ComSucesso(new GradeResponse { Codigo = codigo, Nome = nome, Sigla = sigla });
-        }
-        catch (SqlException ex) when (ex.Number is SqlErroViolacaoUnicidade or SqlErroIndiceUnico)
-        {
+        var existente = await _gradeRepository.ObterPorNomeOuSiglaAsync(nome, sigla);
+        if (existente is not null)
             return ResultadoOperacao<GradeResponse>.Conflito("Já existe uma grade com esse nome ou sigla.");
-        }
+
+        var codigo = await _gradeRepository.CriarAsync(nome, sigla, matricula);
+        return ResultadoOperacao<GradeResponse>.ComSucesso(new GradeResponse { Codigo = codigo, Nome = nome, Sigla = sigla });
     }
 
     public async Task<ResultadoOperacao<GradeResponse>> AtualizarAsync(int codigo, AtualizarGradeRequest request, string matricula)
@@ -82,18 +74,17 @@ public class GradeService : IGradeService
         var nome = request.Nome.Trim();
         var sigla = request.Sigla.Trim();
 
-        try
-        {
-            var atualizado = await _gradeRepository.AtualizarAsync(codigo, nome, sigla, matricula);
-            if (!atualizado)
-                return ResultadoOperacao<GradeResponse>.NaoEncontrado($"Grade {codigo} não encontrada.");
-
-            return ResultadoOperacao<GradeResponse>.ComSucesso(new GradeResponse { Codigo = codigo, Nome = nome, Sigla = sigla });
-        }
-        catch (SqlException ex) when (ex.Number is SqlErroViolacaoUnicidade or SqlErroIndiceUnico)
-        {
+        // Ignora a própria grade na busca por duplicidade: ela pode ser salva
+        // sem alterar nome/sigla, ou trocando só um dos dois campos.
+        var existente = await _gradeRepository.ObterPorNomeOuSiglaAsync(nome, sigla, codigo);
+        if (existente is not null)
             return ResultadoOperacao<GradeResponse>.Conflito("Já existe uma grade com esse nome ou sigla.");
-        }
+
+        var atualizado = await _gradeRepository.AtualizarAsync(codigo, nome, sigla, matricula);
+        if (!atualizado)
+            return ResultadoOperacao<GradeResponse>.NaoEncontrado($"Grade {codigo} não encontrada.");
+
+        return ResultadoOperacao<GradeResponse>.ComSucesso(new GradeResponse { Codigo = codigo, Nome = nome, Sigla = sigla });
     }
 
     public Task<bool> ExcluirAsync(int codigo, string matricula) => _gradeRepository.ExcluirAsync(codigo, matricula);

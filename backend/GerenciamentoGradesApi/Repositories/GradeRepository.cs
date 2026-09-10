@@ -46,6 +46,19 @@ public class GradeRepository : IGradeRepository
         return await connection.QuerySingleOrDefaultAsync<Grade>(sql, new { Codigo = codigo });
     }
 
+    public async Task<Grade?> ObterPorNomeOuSiglaAsync(string nome, string sigla, int? codigoExcluido = null)
+    {
+        const string sql = """
+            SELECT TOP 1 CODIGO AS Codigo, NOME AS Nome, SIGLA AS Sigla
+            FROM grade_precos WITH (NOLOCK)
+            WHERE (NOME = @Nome OR SIGLA = @Sigla)
+              AND (@CodigoExcluido IS NULL OR CODIGO <> @CodigoExcluido)
+            """;
+
+        using var connection = _connectionFactory.CreateConnection();
+        return await connection.QuerySingleOrDefaultAsync<Grade>(sql, new { Nome = nome, Sigla = sigla, CodigoExcluido = codigoExcluido });
+    }
+
     public async Task<IEnumerable<SkuResumo>> ListarSkusPorGradeAsync(int codigo)
     {
         const string sql = """

@@ -8,6 +8,10 @@ public interface IGradeRepository
 
     Task<Grade?> ObterPorCodigoAsync(int codigo);
 
+    // Usado para bloquear nome/sigla duplicados antes de criar/editar. `codigoExcluido`
+    // ignora a própria grade sendo editada (ela pode manter seu nome/sigla atual).
+    Task<Grade?> ObterPorNomeOuSiglaAsync(string nome, string sigla, int? codigoExcluido = null);
+
     Task<IEnumerable<SkuResumo>> ListarSkusPorGradeAsync(int codigo);
 
     Task<IEnumerable<SkuResumo>> BuscarSkusDisponiveisAsync(string termo, int gradeCodigoAtual);
