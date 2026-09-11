@@ -89,16 +89,16 @@ public class GradeRepository : IGradeRepository
         return await connection.QueryAsync<SkuResumo>(sql, new { Termo = termo, GradeCodigoAtual = gradeCodigoAtual });
     }
 
-    public async Task<int?> ObterCodigoPorNomeAsync(string nome)
+    public async Task<Grade?> ObterPorNomeAsync(string nome)
     {
         const string sql = """
-            SELECT TOP 1 CODIGO
+            SELECT TOP 1 CODIGO AS Codigo, NOME AS Nome, SIGLA AS Sigla
             FROM grade_precos WITH (NOLOCK)
             WHERE NOME = @Nome
             """;
 
         using var connection = _connectionFactory.CreateConnection();
-        return await connection.QuerySingleOrDefaultAsync<int?>(sql, new { Nome = nome });
+        return await connection.QuerySingleOrDefaultAsync<Grade>(sql, new { Nome = nome });
     }
 
     public async Task<int> CriarAsync(string nome, string sigla, string matricula)

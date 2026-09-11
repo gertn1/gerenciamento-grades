@@ -16,7 +16,7 @@ public interface IGradeRepository
 
     Task<IEnumerable<SkuResumo>> BuscarSkusDisponiveisAsync(string termo, int gradeCodigoAtual);
 
-    Task<int?> ObterCodigoPorNomeAsync(string nome);
+    Task<Grade?> ObterPorNomeAsync(string nome);
 
     Task<int> CriarAsync(string nome, string sigla, string matricula);
 

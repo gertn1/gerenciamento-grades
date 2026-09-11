@@ -21,7 +21,7 @@ public class PlanilhaGradeService : IPlanilhaGradeService
         var planilha = workbook.Worksheets.Add("Grades");
 
         planilha.Cell(1, 1).Value = "SKU";
-        planilha.Cell(1, 2).Value = "GRADE";
+        planilha.Cell(1, 2).Value = "NOME_GRADE";
         planilha.Cell(1, 3).Value = "SIGLA";
         planilha.Range(1, 1, 1, 3).Style.Font.Bold = true;
         planilha.Columns().AdjustToContents();
@@ -72,13 +72,13 @@ public class PlanilhaGradeService : IPlanilhaGradeService
         {
             if (string.IsNullOrWhiteSpace(linha.Sku) || string.IsNullOrWhiteSpace(linha.GradeNome) || string.IsNullOrWhiteSpace(linha.Sigla))
             {
-                erros.Add(new ErroLinhaResponse { Linha = linha.Linha, Mensagem = "SKU, GRADE e SIGLA são obrigatórios." });
+                erros.Add(new ErroLinhaResponse { Linha = linha.Linha, Mensagem = "SKU, NOME_GRADE e SIGLA são obrigatórios." });
                 continue;
             }
 
             if (linha.GradeNome.Length > 80)
             {
-                erros.Add(new ErroLinhaResponse { Linha = linha.Linha, Mensagem = "GRADE deve ter no máximo 80 caracteres." });
+                erros.Add(new ErroLinhaResponse { Linha = linha.Linha, Mensagem = "NOME_GRADE deve ter no máximo 80 caracteres." });
                 continue;
             }
 
@@ -137,8 +137,58 @@ public class PlanilhaGradeService : IPlanilhaGradeService
         var sucesso = 0;
         foreach (var (gradeNome, itens) in itensPorGrade)
         {
-            var codigoGrade = await _gradeRepository.ObterCodigoPorNomeAsync(gradeNome)
-                ?? await _gradeRepository.CriarAsync(gradeNome, itens[0].Sigla, matricula);
+            // A mesma GRADE (nome) não pode aparecer com siglas diferentes dentro
+            // do próprio arquivo — sem isso, qual das duas seria usada ficaria
+            // arbitrário (a da primeira linha lida).
+            var siglasDaGrade = itens.Select(i => i.Sigla).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            if (siglasDaGrade.Count > 1)
+            {
+                erros.AddRange(itens.Select(i => new ErroLinhaResponse
+                {
+                    Linha = i.Linha,
+                    Mensagem = $"NOME_GRADE '{gradeNome}' aparece com siglas diferentes na planilha ({string.Join(", ", siglasDaGrade)})."
+                }));
+                continue;
+            }
+
+            var siglaGrade = siglasDaGrade[0];
+            var gradeExistente = await _gradeRepository.ObterPorNomeAsync(gradeNome);
+            int codigoGrade;
+
+            if (gradeExistente is not null)
+            {
+                // A grade já existe — a sigla da planilha não é usada pra
+                // alterá-la silenciosamente; se divergir da sigla real, é erro.
+                if (!string.Equals(gradeExistente.Sigla, siglaGrade, StringComparison.OrdinalIgnoreCase))
+                {
+                    erros.AddRange(itens.Select(i => new ErroLinhaResponse
+                    {
+                        Linha = i.Linha,
+                        Mensagem = $"NOME_GRADE '{gradeNome}' já existe com a sigla '{gradeExistente.Sigla}' — a sigla informada '{siglaGrade}' diverge."
+                    }));
+                    continue;
+                }
+
+                codigoGrade = gradeExistente.Codigo;
+            }
+            else
+            {
+                // Grade nova — a sigla não pode colidir com a de uma grade
+                // diferente já existente (mesma regra aplicada na criação
+                // individual, ver GradeService.CriarAsync).
+                var conflito = await _gradeRepository.ObterPorNomeOuSiglaAsync(gradeNome, siglaGrade);
+                if (conflito is not null)
+                {
+                    erros.AddRange(itens.Select(i => new ErroLinhaResponse
+                    {
+                        Linha = i.Linha,
+                        Mensagem = $"SIGLA '{siglaGrade}' já está em uso pela grade {conflito.Codigo} - {conflito.Nome}."
+                    }));
+                    continue;
+                }
+
+                codigoGrade = await _gradeRepository.CriarAsync(gradeNome, siglaGrade, matricula);
+            }
 
             var bloqueados = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var paraVincular = new List<string>();
@@ -280,14 +330,14 @@ public class PlanilhaGradeService : IPlanilhaGradeService
     {
         using var workbook = new XLWorkbook(arquivo);
         var planilha = workbook.Worksheet(1);
-        var colunas = MapearColunas(planilha, "SKU", "GRADE", "SIGLA");
+        var colunas = MapearColunas(planilha, "SKU", "NOME_GRADE", "SIGLA");
         var ultimaLinha = planilha.LastRowUsed()?.RowNumber() ?? 1;
 
         var linhas = new List<LinhaImportacao>();
         for (var linhaAtual = 2; linhaAtual <= ultimaLinha; linhaAtual++)
         {
             var sku = planilha.Cell(linhaAtual, colunas["SKU"]).GetString().Trim();
-            var grade = planilha.Cell(linhaAtual, colunas["GRADE"]).GetString().Trim();
+            var grade = planilha.Cell(linhaAtual, colunas["NOME_GRADE"]).GetString().Trim();
             var sigla = planilha.Cell(linhaAtual, colunas["SIGLA"]).GetString().Trim();
 
             if (string.IsNullOrWhiteSpace(sku) && string.IsNullOrWhiteSpace(grade) && string.IsNullOrWhiteSpace(sigla))
