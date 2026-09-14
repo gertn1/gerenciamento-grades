@@ -4,6 +4,7 @@ using GerenciamentoGradesApi.Repositories;
 using GerenciamentoGradesApi.Repositories.Interfaces;
 using GerenciamentoGradesApi.Services;
 using GerenciamentoGradesApi.Services.Interfaces;
+using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -18,7 +19,9 @@ builder.Services.AddCors(options => options.AddPolicy("Frontend", policy => poli
     .AllowAnyMethod()
     .AllowAnyHeader()));
 
-builder.Services.AddSingleton<IDbConnectionFactory, SqlConnectionFactory>();
+builder.Services.AddDbContext<GradesDbContext>(options => options.UseSqlServer(
+    builder.Configuration.GetConnectionString("COSMOS")
+        ?? throw new InvalidOperationException("Connection string 'COSMOS' não configurada.")));
 builder.Services.AddScoped<IGradeRepository, GradeRepository>();
 builder.Services.AddScoped<IAuditoriaRepository, AuditoriaRepository>();
 builder.Services.AddScoped<IGradeService, GradeService>();
