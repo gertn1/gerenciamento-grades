@@ -8,6 +8,7 @@ import type {
   GradeListItem,
   ImportacaoResult,
   SkuResumo,
+  SkusOrfaosResult,
 } from '../types/grade';
 
 export const baseURL = import.meta.env.VITE_API_GRADES_URL ?? 'http://localhost:5244/api/grades';
@@ -65,6 +66,16 @@ export async function adicionarSkus(codigo: number, skus: string[]): Promise<Atu
 
 export async function removerSkus(codigo: number, skus: string[]): Promise<AtualizarSkusResult> {
   const { data } = await api.post<AtualizarSkusResult>(`/${codigo}/skus/remover`, { skus });
+  return data;
+}
+
+export async function listarSkusOrfaos(pagina: number, tamanhoPagina: number): Promise<SkusOrfaosResult> {
+  const { data } = await api.get<SkusOrfaosResult>('/skus-orfaos', { params: { pagina, tamanhoPagina } });
+  return data;
+}
+
+export async function listarGradesVazias(): Promise<GradeListItem[]> {
+  const { data } = await api.get<GradeListItem[]>('/grades-vazias');
   return data;
 }
 

@@ -3,6 +3,7 @@ import {
   EditOutlined,
   EyeOutlined,
   FileExcelOutlined,
+  FileSearchOutlined,
   ImportOutlined,
   PlusOutlined,
   UploadOutlined,
@@ -22,6 +23,7 @@ import {
 import type { Grade, GradeListItem } from '../types/grade';
 import { AppHeader } from './AppHeader';
 import { BulkOperationModal } from './BulkOperationModal';
+import { DiagnosticoModal } from './DiagnosticoModal';
 import { GradeDeleteModal } from './GradeDeleteModal';
 import { GradeDetailModal } from './GradeDetailModal';
 import { GradeFormModal } from './GradeFormModal';
@@ -49,6 +51,7 @@ export function GradesPage() {
   const [criacaoMassivaAberta, setCriacaoMassivaAberta] = useState(false);
   const [importacaoMassivaAberta, setImportacaoMassivaAberta] = useState(false);
   const [exclusaoMassivaAberta, setExclusaoMassivaAberta] = useState(false);
+  const [diagnosticoAberto, setDiagnosticoAberto] = useState(false);
 
   const carregarGrades = useCallback(async () => {
     try {
@@ -177,6 +180,11 @@ export function GradesPage() {
             </Button>
           </Col>
           <Col>
+            <Button icon={<FileSearchOutlined />} onClick={() => setDiagnosticoAberto(true)}>
+              Diagnóstico
+            </Button>
+          </Col>
+          <Col>
             <Button
               type="primary"
               icon={<PlusOutlined />}
@@ -261,6 +269,15 @@ export function GradesPage() {
         onUpload={importacaoMassivaAtualizacao}
         onFinished={carregarGrades}
         onClose={() => setImportacaoMassivaAberta(false)}
+      />
+
+      <DiagnosticoModal
+        open={diagnosticoAberto}
+        onClose={() => setDiagnosticoAberto(false)}
+        onAbrirGrade={(codigo) => {
+          setCodigoDetalhe(codigo);
+          setDetalheAberto(true);
+        }}
       />
 
       <BulkOperationModal

@@ -40,6 +40,23 @@ public class GradesController : ControllerBase
         return Ok(detalhe);
     }
 
+    [HttpGet("skus-orfaos")]
+    public async Task<ActionResult<SkusOrfaosResponse>> ListarSkusOrfaos([FromQuery] int pagina = 1, [FromQuery] int tamanhoPagina = 20)
+    {
+        if (pagina < 1) pagina = 1;
+        if (tamanhoPagina is < 1 or > 100) tamanhoPagina = 20;
+
+        var resultado = await _gradeService.ListarSkusOrfaosAsync(pagina, tamanhoPagina);
+        return Ok(resultado);
+    }
+
+    [HttpGet("grades-vazias")]
+    public async Task<ActionResult<IEnumerable<GradeListItemResponse>>> ListarGradesVazias()
+    {
+        var grades = await _gradeService.ListarGradesVaziasAsync();
+        return Ok(grades);
+    }
+
     [HttpGet("{codigo:int}/skus-disponiveis")]
     public async Task<ActionResult<IEnumerable<SkuResumoResponse>>> BuscarSkusDisponiveis(int codigo, [FromQuery] string? termo)
     {

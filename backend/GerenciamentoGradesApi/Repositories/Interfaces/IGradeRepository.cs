@@ -16,6 +16,12 @@ public interface IGradeRepository
 
     Task<IEnumerable<SkuResumo>> BuscarSkusDisponiveisAsync(string termo, int gradeCodigoAtual);
 
+    // Diagnóstico: produtos sem nenhuma grade vinculada (paginado — a tabela
+    // de produtos é grande) e grades cadastradas sem nenhum SKU vinculado.
+    Task<(IEnumerable<SkuResumo> Itens, int Total)> ListarSkusOrfaosAsync(int pagina, int tamanhoPagina);
+
+    Task<IEnumerable<GradeListItem>> ListarGradesVaziasAsync();
+
     Task<Grade?> ObterPorNomeAsync(string nome);
 
     Task<int> CriarAsync(string nome, string sigla, string matricula);

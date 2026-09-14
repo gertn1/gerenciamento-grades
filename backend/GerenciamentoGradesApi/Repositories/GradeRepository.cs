@@ -80,6 +80,31 @@ public class GradeRepository : IGradeRepository
             .ToListAsync();
     }
 
+    public async Task<(IEnumerable<SkuResumo> Itens, int Total)> ListarSkusOrfaosAsync(int pagina, int tamanhoPagina)
+    {
+        var query = _context.ProdutosMestre.AsNoTracking().Where(p => p.CodigoGradePrecos == null);
+
+        var total = await query.CountAsync();
+
+        var itens = await query
+            .OrderBy(p => p.Codigo)
+            .Skip((pagina - 1) * tamanhoPagina)
+            .Take(tamanhoPagina)
+            .Select(p => new SkuResumo { Codigo = p.Codigo.ToString(), Descricao = p.Descricao ?? string.Empty })
+            .ToListAsync();
+
+        return (itens, total);
+    }
+
+    public async Task<IEnumerable<GradeListItem>> ListarGradesVaziasAsync()
+    {
+        return await _context.Grades.AsNoTracking()
+            .Where(g => !_context.ProdutosMestre.Any(p => p.CodigoGradePrecos == g.Codigo))
+            .OrderBy(g => g.Codigo)
+            .Select(g => new GradeListItem { Codigo = g.Codigo, Nome = g.Nome, Sigla = g.Sigla, QtdSkus = 0 })
+            .ToListAsync();
+    }
+
     public async Task<int> CriarAsync(string nome, string sigla, string matricula)
     {
         await using var transaction = await _context.Database.BeginTransactionAsync();

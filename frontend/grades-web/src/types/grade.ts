@@ -42,3 +42,10 @@ export interface GradeFormValues {
   nome: string;
   sigla: string;
 }
+
+export interface SkusOrfaosResult {
+  itens: SkuResumo[];
+  total: number;
+  pagina: number;
+  tamanhoPagina: number;
+}

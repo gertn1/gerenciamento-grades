@@ -52,6 +52,32 @@ public class GradeService : IGradeService
         return skus.Select(MapearSku);
     }
 
+    public async Task<SkusOrfaosResponse> ListarSkusOrfaosAsync(int pagina, int tamanhoPagina)
+    {
+        var (itens, total) = await _gradeRepository.ListarSkusOrfaosAsync(pagina, tamanhoPagina);
+
+        return new SkusOrfaosResponse
+        {
+            Itens = itens.Select(MapearSku).ToList(),
+            Total = total,
+            Pagina = pagina,
+            TamanhoPagina = tamanhoPagina
+        };
+    }
+
+    public async Task<IEnumerable<GradeListItemResponse>> ListarGradesVaziasAsync()
+    {
+        var grades = await _gradeRepository.ListarGradesVaziasAsync();
+
+        return grades.Select(g => new GradeListItemResponse
+        {
+            Codigo = g.Codigo,
+            Nome = g.Nome,
+            Sigla = g.Sigla,
+            QtdSkus = g.QtdSkus
+        });
+    }
+
     public async Task<ResultadoOperacao<GradeResponse>> CriarAsync(CriarGradeRequest request, string matricula)
     {
         var nome = request.Nome.Trim();
