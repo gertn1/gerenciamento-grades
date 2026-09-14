@@ -7,15 +7,8 @@ using GerenciamentoGradesApi.Services.Resultados;
 
 namespace GerenciamentoGradesApi.Services;
 
-public class GradeService : IGradeService
+public class GradeService(IGradeRepository _gradeRepository) : IGradeService
 {
-    private readonly IGradeRepository _gradeRepository;
-
-    public GradeService(IGradeRepository gradeRepository)
-    {
-        _gradeRepository = gradeRepository;
-    }
-
     public async Task<IEnumerable<GradeListItemResponse>> ListarAsync(int? codigo, string? nome)
     {
         var grades = await _gradeRepository.ListarAsync(codigo, nome);
@@ -146,7 +139,7 @@ public class GradeService : IGradeService
             }
 
             if (vinculo?.CodigoGrade == codigo)
-                continue; 
+                continue;
 
             paraVincular.Add(sku);
         }
