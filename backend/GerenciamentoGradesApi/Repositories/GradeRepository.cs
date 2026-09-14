@@ -5,17 +5,9 @@ using Microsoft.EntityFrameworkCore;
 
 namespace GerenciamentoGradesApi.Repositories;
 
-public class GradeRepository : IGradeRepository
+public class GradeRepository(GradesDbContext _context,IAuditoriaRepository _auditoriaRepository) : IGradeRepository
 {
-    private readonly GradesDbContext _context;
-    private readonly IAuditoriaRepository _auditoriaRepository;
-
-    public GradeRepository(GradesDbContext context, IAuditoriaRepository auditoriaRepository)
-    {
-        _context = context;
-        _auditoriaRepository = auditoriaRepository;
-    }
-
+    
     public async Task<IEnumerable<GradeListItem>> ListarAsync(int? codigo, string? nome)
     {
         var query = _context.Grades.AsNoTracking().AsQueryable();
@@ -205,7 +197,7 @@ public class GradeRepository : IGradeRepository
                 TipoOperacao = "DELETE",
                 CodigoGrade = codigo,
                 EstadoAnterior = estadoAnterior,
-                EstadoNovo = "Deletado",
+                EstadoNovo = {},
                 Matricula = matricula
             }, _context);
 
