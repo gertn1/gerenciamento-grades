@@ -48,10 +48,6 @@ public class GradeService : IGradeService
 
     public async Task<IEnumerable<SkuResumoResponse>?> BuscarSkusDisponiveisAsync(int codigo, string? termo)
     {
-        var grade = await _gradeRepository.ObterPorCodigoAsync(codigo);
-        if (grade is null)
-            return null;
-
         var skus = await _gradeRepository.BuscarSkusDisponiveisAsync(termo?.Trim() ?? string.Empty, codigo);
         return skus.Select(MapearSku);
     }
