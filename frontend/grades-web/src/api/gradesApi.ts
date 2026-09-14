@@ -83,6 +83,13 @@ export async function importacaoMassiva(arquivo: File): Promise<ImportacaoResult
   return data;
 }
 
+export async function importacaoMassivaAtualizacao(arquivo: File): Promise<ImportacaoResult> {
+  const formData = new FormData();
+  formData.append('file', arquivo);
+  const { data } = await api.post<ImportacaoResult>('/importacao-massiva-atualizacao', formData);
+  return data;
+}
+
 export async function exclusaoMassivaSkus(arquivo: File): Promise<ImportacaoResult> {
   const formData = new FormData();
   formData.append('file', arquivo);

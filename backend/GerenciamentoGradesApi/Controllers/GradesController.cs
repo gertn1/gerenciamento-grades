@@ -138,6 +138,23 @@ public class GradesController : ControllerBase
         };
     }
 
+    [HttpPost("importacao-massiva-atualizacao")]
+    [RequestSizeLimit(20_000_000)]
+    public async Task<ActionResult<ImportacaoResultResponse>> ImportacaoMassivaAtualizacao(IFormFile? file)
+    {
+        if (file is null || file.Length == 0)
+            return BadRequest(new { mensagem = "Nenhum arquivo enviado." });
+
+        var resultado = await _planilhaGradeService.AtualizarEmMassaAsync(file.OpenReadStream(), file.FileName, HttpContext.ObterMatricula());
+
+        return resultado.Status switch
+        {
+            StatusOperacao.Sucesso => Ok(resultado.Valor),
+            StatusOperacao.EntradaInvalida => BadRequest(new { mensagem = resultado.MensagemErro }),
+            _ => Problem(resultado.MensagemErro)
+        };
+    }
+
     [HttpPost("exclusao-massiva-skus")]
     [RequestSizeLimit(20_000_000)]
     public async Task<ActionResult<ImportacaoResultResponse>> ExclusaoMassivaSkus(IFormFile? file)

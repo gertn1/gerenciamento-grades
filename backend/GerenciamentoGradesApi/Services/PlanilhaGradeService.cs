@@ -46,7 +46,19 @@ public class PlanilhaGradeService : IPlanilhaGradeService
         return stream.ToArray();
     }
 
-    public async Task<ResultadoOperacao<ImportacaoResultResponse>> ImportarAsync(Stream conteudoArquivo, string nomeArquivo, string matricula)
+    // "Criação massiva": pode criar grades novas quando o NOME_GRADE da
+    // planilha ainda não existe.
+    public Task<ResultadoOperacao<ImportacaoResultResponse>> ImportarAsync(Stream conteudoArquivo, string nomeArquivo, string matricula) =>
+        ProcessarArquivoAsync(conteudoArquivo, nomeArquivo, matricula, permiteCriarNovaGrade: true);
+
+    // "Importação massiva" (atualização): mesma planilha e mesmas regras da
+    // criação, mas só vincula SKUs a grades que já existem — NOME_GRADE
+    // inexistente é rejeitado em vez de criar uma grade nova.
+    public Task<ResultadoOperacao<ImportacaoResultResponse>> AtualizarEmMassaAsync(Stream conteudoArquivo, string nomeArquivo, string matricula) =>
+        ProcessarArquivoAsync(conteudoArquivo, nomeArquivo, matricula, permiteCriarNovaGrade: false);
+
+    private async Task<ResultadoOperacao<ImportacaoResultResponse>> ProcessarArquivoAsync(
+        Stream conteudoArquivo, string nomeArquivo, string matricula, bool permiteCriarNovaGrade)
     {
         var erroExtensao = ValidarExtensao(nomeArquivo);
         if (erroExtensao is not null)
@@ -65,8 +77,23 @@ public class PlanilhaGradeService : IPlanilhaGradeService
         if (linhas.Count == 0)
             return ResultadoOperacao<ImportacaoResultResponse>.EntradaInvalida("A planilha não contém dados.");
 
+        var (linhasValidas, errosValidacao) = ValidarLinhasImportacao(linhas);
+        var (sucesso, errosProcessamento) = await ProcessarVinculosAsync(linhasValidas, permiteCriarNovaGrade, matricula);
+
+        var resultado = new ImportacaoResultResponse
+        {
+            TotalLinhas = linhas.Count,
+            Sucesso = sucesso,
+            Erros = [.. errosValidacao, .. errosProcessamento]
+        };
+
+        return ResultadoOperacao<ImportacaoResultResponse>.ComSucesso(resultado);
+    }
+
+    private static (List<LinhaImportacao> Validas, List<ErroLinhaResponse> Erros) ValidarLinhasImportacao(List<LinhaImportacao> linhas)
+    {
         var erros = new List<ErroLinhaResponse>();
-        var linhasValidas = new List<LinhaImportacao>();
+        var validas = new List<LinhaImportacao>();
 
         foreach (var linha in linhas)
         {
@@ -88,9 +115,21 @@ public class PlanilhaGradeService : IPlanilhaGradeService
                 continue;
             }
 
-            linhasValidas.Add(linha);
+            validas.Add(linha);
         }
 
+        return (validas, erros);
+    }
+
+    // Núcleo compartilhado entre criação e atualização em massa: agrupa por
+    // NOME_GRADE, resolve/cria o código de cada grade (conforme
+    // `permiteCriarNovaGrade`) e aplica a regra "SKU só vincula se estiver
+    // livre ou já pertencer à própria grade de destino" — a mesma usada na
+    // adição individual de SKUs (GradeService.AdicionarSkusAsync).
+    private async Task<(int Sucesso, List<ErroLinhaResponse> Erros)> ProcessarVinculosAsync(
+        List<LinhaImportacao> linhasValidas, bool permiteCriarNovaGrade, string matricula)
+    {
+        var erros = new List<ErroLinhaResponse>();
         var skusExistentes = await _gradeRepository.FiltrarSkusExistentesAsync(linhasValidas.Select(l => l.Sku));
 
         var itensPorGrade = new Dictionary<string, List<LinhaImportacao>>(StringComparer.OrdinalIgnoreCase);
@@ -151,44 +190,9 @@ public class PlanilhaGradeService : IPlanilhaGradeService
                 continue;
             }
 
-            var siglaGrade = siglasDaGrade[0];
-            var gradeExistente = await _gradeRepository.ObterPorNomeAsync(gradeNome);
-            int codigoGrade;
-
-            if (gradeExistente is not null)
-            {
-                // A grade já existe — a sigla da planilha não é usada pra
-                // alterá-la silenciosamente; se divergir da sigla real, é erro.
-                if (!string.Equals(gradeExistente.Sigla, siglaGrade, StringComparison.OrdinalIgnoreCase))
-                {
-                    erros.AddRange(itens.Select(i => new ErroLinhaResponse
-                    {
-                        Linha = i.Linha,
-                        Mensagem = $"NOME_GRADE '{gradeNome}' já existe com a sigla '{gradeExistente.Sigla}' — a sigla informada '{siglaGrade}' diverge."
-                    }));
-                    continue;
-                }
-
-                codigoGrade = gradeExistente.Codigo;
-            }
-            else
-            {
-                // Grade nova — a sigla não pode colidir com a de uma grade
-                // diferente já existente (mesma regra aplicada na criação
-                // individual, ver GradeService.CriarAsync).
-                var conflito = await _gradeRepository.ObterPorNomeOuSiglaAsync(gradeNome, siglaGrade);
-                if (conflito is not null)
-                {
-                    erros.AddRange(itens.Select(i => new ErroLinhaResponse
-                    {
-                        Linha = i.Linha,
-                        Mensagem = $"SIGLA '{siglaGrade}' já está em uso pela grade {conflito.Codigo} - {conflito.Nome}."
-                    }));
-                    continue;
-                }
-
-                codigoGrade = await _gradeRepository.CriarAsync(gradeNome, siglaGrade, matricula);
-            }
+            var codigoGrade = await ResolverCodigoGradeAsync(gradeNome, siglasDaGrade[0], permiteCriarNovaGrade, matricula, itens, erros);
+            if (codigoGrade is null)
+                continue;
 
             var bloqueados = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var paraVincular = new List<string>();
@@ -197,17 +201,17 @@ public class PlanilhaGradeService : IPlanilhaGradeService
             {
                 vinculoEfetivo.TryGetValue(sku, out var codigoAtual);
 
-                if (codigoAtual is int codigo && codigo != codigoGrade)
+                if (codigoAtual is int codigo && codigo != codigoGrade.Value)
                     bloqueados.Add(sku);
-                else if (codigoAtual != codigoGrade)
+                else if (codigoAtual != codigoGrade.Value)
                     paraVincular.Add(sku);
             }
 
             if (paraVincular.Count > 0)
             {
-                await _gradeRepository.VincularSkusAsync(codigoGrade, paraVincular, matricula);
+                await _gradeRepository.VincularSkusAsync(codigoGrade.Value, paraVincular, matricula);
                 foreach (var sku in paraVincular)
-                    vinculoEfetivo[sku] = codigoGrade;
+                    vinculoEfetivo[sku] = codigoGrade.Value;
             }
 
             foreach (var linha in itens)
@@ -229,14 +233,61 @@ public class PlanilhaGradeService : IPlanilhaGradeService
             }
         }
 
-        var resultado = new ImportacaoResultResponse
-        {
-            TotalLinhas = linhas.Count,
-            Sucesso = sucesso,
-            Erros = erros
-        };
+        return (sucesso, erros);
+    }
 
-        return ResultadoOperacao<ImportacaoResultResponse>.ComSucesso(resultado);
+    // Resolve o código da grade de destino para um grupo de linhas, ou
+    // registra o(s) erro(s) e devolve null quando o grupo inteiro deve ser
+    // rejeitado (sigla divergente, sigla já usada por outra grade, ou — na
+    // atualização — grade inexistente).
+    private async Task<int?> ResolverCodigoGradeAsync(
+        string gradeNome, string siglaGrade, bool permiteCriarNovaGrade, string matricula,
+        List<LinhaImportacao> itens, List<ErroLinhaResponse> erros)
+    {
+        var gradeExistente = await _gradeRepository.ObterPorNomeAsync(gradeNome);
+
+        if (gradeExistente is not null)
+        {
+            // A grade já existe — a sigla da planilha não é usada pra
+            // alterá-la silenciosamente; se divergir da sigla real, é erro.
+            if (!string.Equals(gradeExistente.Sigla, siglaGrade, StringComparison.OrdinalIgnoreCase))
+            {
+                erros.AddRange(itens.Select(i => new ErroLinhaResponse
+                {
+                    Linha = i.Linha,
+                    Mensagem = $"NOME_GRADE '{gradeNome}' já existe com a sigla '{gradeExistente.Sigla}' — a sigla informada '{siglaGrade}' diverge."
+                }));
+                return null;
+            }
+
+            return gradeExistente.Codigo;
+        }
+
+        if (!permiteCriarNovaGrade)
+        {
+            erros.AddRange(itens.Select(i => new ErroLinhaResponse
+            {
+                Linha = i.Linha,
+                Mensagem = $"NOME_GRADE '{gradeNome}' não encontrada — esta importação só atualiza SKUs de grades já existentes."
+            }));
+            return null;
+        }
+
+        // Grade nova — a sigla não pode colidir com a de uma grade diferente
+        // já existente (mesma regra aplicada na criação individual, ver
+        // GradeService.CriarAsync).
+        var conflito = await _gradeRepository.ObterPorNomeOuSiglaAsync(gradeNome, siglaGrade);
+        if (conflito is not null)
+        {
+            erros.AddRange(itens.Select(i => new ErroLinhaResponse
+            {
+                Linha = i.Linha,
+                Mensagem = $"SIGLA '{siglaGrade}' já está em uso pela grade {conflito.Codigo} - {conflito.Nome}."
+            }));
+            return null;
+        }
+
+        return await _gradeRepository.CriarAsync(gradeNome, siglaGrade, matricula);
     }
 
     public async Task<ResultadoOperacao<ImportacaoResultResponse>> ExcluirSkusEmMassaAsync(Stream conteudoArquivo, string nomeArquivo, string matricula)

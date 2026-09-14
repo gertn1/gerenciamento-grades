@@ -15,5 +15,9 @@ public interface IPlanilhaGradeService
 
     Task<ResultadoOperacao<ImportacaoResultResponse>> ImportarAsync(Stream conteudoArquivo, string nomeArquivo, string matricula);
 
+    // Mesma planilha e mesmas regras da criação em massa, mas nunca cria
+    // grade nova — NOME_GRADE precisa já existir, senão a linha é rejeitada.
+    Task<ResultadoOperacao<ImportacaoResultResponse>> AtualizarEmMassaAsync(Stream conteudoArquivo, string nomeArquivo, string matricula);
+
     Task<ResultadoOperacao<ImportacaoResultResponse>> ExcluirSkusEmMassaAsync(Stream conteudoArquivo, string nomeArquivo, string matricula);
 }

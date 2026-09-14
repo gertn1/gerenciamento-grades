@@ -3,6 +3,7 @@ import {
   EditOutlined,
   EyeOutlined,
   FileExcelOutlined,
+  ImportOutlined,
   PlusOutlined,
   UploadOutlined,
 } from '@ant-design/icons';
@@ -13,6 +14,7 @@ import {
   exclusaoMassivaSkus,
   extrairMensagemErro,
   importacaoMassiva,
+  importacaoMassivaAtualizacao,
   listarGrades,
   urlModeloExclusaoMassivaSkus,
   urlModeloImportacaoMassiva,
@@ -45,6 +47,7 @@ export function GradesPage() {
   );
 
   const [criacaoMassivaAberta, setCriacaoMassivaAberta] = useState(false);
+  const [importacaoMassivaAberta, setImportacaoMassivaAberta] = useState(false);
   const [exclusaoMassivaAberta, setExclusaoMassivaAberta] = useState(false);
 
   const carregarGrades = useCallback(async () => {
@@ -164,6 +167,11 @@ export function GradesPage() {
             </Button>
           </Col>
           <Col>
+            <Button icon={<ImportOutlined />} onClick={() => setImportacaoMassivaAberta(true)}>
+              Importação massiva
+            </Button>
+          </Col>
+          <Col>
             <Button icon={<UploadOutlined />} onClick={() => setExclusaoMassivaAberta(true)}>
               Exclusão massiva
             </Button>
@@ -242,6 +250,17 @@ export function GradesPage() {
         onUpload={importacaoMassiva}
         onFinished={carregarGrades}
         onClose={() => setCriacaoMassivaAberta(false)}
+      />
+
+      <BulkOperationModal
+        open={importacaoMassivaAberta}
+        title="Importação massiva"
+        subtitle="Atualize o vínculo de SKUs em grades já existentes via arquivo Excel — não cria grades novas."
+        templateUrl={urlModeloImportacaoMassiva()}
+        templateFileName="modelo_criacao_massiva_grades.xlsx"
+        onUpload={importacaoMassivaAtualizacao}
+        onFinished={carregarGrades}
+        onClose={() => setImportacaoMassivaAberta(false)}
       />
 
       <BulkOperationModal
