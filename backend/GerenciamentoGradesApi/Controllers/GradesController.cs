@@ -41,19 +41,21 @@ public class GradesController : ControllerBase
     }
 
     [HttpGet("skus-orfaos")]
-    public async Task<ActionResult<SkusOrfaosResponse>> ListarSkusOrfaos([FromQuery] int pagina = 1, [FromQuery] int tamanhoPagina = 20)
+    public async Task<ActionResult<SkusOrfaosResponse>> ListarSkusOrfaos(
+        [FromQuery] string? termo, [FromQuery] int pagina = 1, [FromQuery] int tamanhoPagina = 20)
     {
         if (pagina < 1) pagina = 1;
         if (tamanhoPagina is < 1 or > 100) tamanhoPagina = 20;
 
-        var resultado = await _gradeService.ListarSkusOrfaosAsync(pagina, tamanhoPagina);
+        var resultado = await _gradeService.ListarSkusOrfaosAsync(termo, pagina, tamanhoPagina);
         return Ok(resultado);
     }
 
     [HttpGet("grades-vazias")]
-    public async Task<ActionResult<IEnumerable<GradeListItemResponse>>> ListarGradesVazias()
+    public async Task<ActionResult<IEnumerable<GradeListItemResponse>>> ListarGradesVazias(
+        [FromQuery] int? codigo, [FromQuery] string? nome)
     {
-        var grades = await _gradeService.ListarGradesVaziasAsync();
+        var grades = await _gradeService.ListarGradesVaziasAsync(codigo, nome);
         return Ok(grades);
     }
 

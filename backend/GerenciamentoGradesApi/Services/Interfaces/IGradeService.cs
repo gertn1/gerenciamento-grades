@@ -15,9 +15,9 @@ public interface IGradeService
     Task<IEnumerable<SkuResumoResponse>?> BuscarSkusDisponiveisAsync(int codigo, string? termo);
 
     // Diagnóstico: produtos sem grade (paginado) e grades sem nenhum SKU.
-    Task<SkusOrfaosResponse> ListarSkusOrfaosAsync(int pagina, int tamanhoPagina);
+    Task<SkusOrfaosResponse> ListarSkusOrfaosAsync(string? termo, int pagina, int tamanhoPagina);
 
-    Task<IEnumerable<GradeListItemResponse>> ListarGradesVaziasAsync();
+    Task<IEnumerable<GradeListItemResponse>> ListarGradesVaziasAsync(int? codigo, string? nome);
 
     Task<ResultadoOperacao<GradeResponse>> CriarAsync(CriarGradeRequest request, string matricula);
 

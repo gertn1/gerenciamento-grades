@@ -69,13 +69,17 @@ export async function removerSkus(codigo: number, skus: string[]): Promise<Atual
   return data;
 }
 
-export async function listarSkusOrfaos(pagina: number, tamanhoPagina: number): Promise<SkusOrfaosResult> {
-  const { data } = await api.get<SkusOrfaosResult>('/skus-orfaos', { params: { pagina, tamanhoPagina } });
+export async function listarSkusOrfaos(
+  pagina: number,
+  tamanhoPagina: number,
+  termo?: string,
+): Promise<SkusOrfaosResult> {
+  const { data } = await api.get<SkusOrfaosResult>('/skus-orfaos', { params: { pagina, tamanhoPagina, termo } });
   return data;
 }
 
-export async function listarGradesVazias(): Promise<GradeListItem[]> {
-  const { data } = await api.get<GradeListItem[]>('/grades-vazias');
+export async function listarGradesVazias(filtro: { codigo?: number; nome?: string }): Promise<GradeListItem[]> {
+  const { data } = await api.get<GradeListItem[]>('/grades-vazias', { params: filtro });
   return data;
 }
 

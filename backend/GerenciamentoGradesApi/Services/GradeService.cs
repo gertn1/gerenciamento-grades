@@ -52,9 +52,9 @@ public class GradeService : IGradeService
         return skus.Select(MapearSku);
     }
 
-    public async Task<SkusOrfaosResponse> ListarSkusOrfaosAsync(int pagina, int tamanhoPagina)
+    public async Task<SkusOrfaosResponse> ListarSkusOrfaosAsync(string? termo, int pagina, int tamanhoPagina)
     {
-        var (itens, total) = await _gradeRepository.ListarSkusOrfaosAsync(pagina, tamanhoPagina);
+        var (itens, total) = await _gradeRepository.ListarSkusOrfaosAsync(termo?.Trim(), pagina, tamanhoPagina);
 
         return new SkusOrfaosResponse
         {
@@ -65,9 +65,9 @@ public class GradeService : IGradeService
         };
     }
 
-    public async Task<IEnumerable<GradeListItemResponse>> ListarGradesVaziasAsync()
+    public async Task<IEnumerable<GradeListItemResponse>> ListarGradesVaziasAsync(int? codigo, string? nome)
     {
-        var grades = await _gradeRepository.ListarGradesVaziasAsync();
+        var grades = await _gradeRepository.ListarGradesVaziasAsync(codigo, nome?.Trim());
 
         return grades.Select(g => new GradeListItemResponse
         {

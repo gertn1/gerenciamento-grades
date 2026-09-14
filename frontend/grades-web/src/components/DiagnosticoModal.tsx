@@ -1,4 +1,5 @@
-import { Button, Modal, Table, Tabs, Typography, message } from 'antd';
+import { SearchOutlined } from '@ant-design/icons';
+import { Button, Col, Input, InputNumber, Modal, Row, Table, Tabs, Typography, message } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { useEffect, useState } from 'react';
 import { extrairMensagemErro, listarGradesVazias, listarSkusOrfaos } from '../api/gradesApi';
@@ -15,25 +16,32 @@ interface DiagnosticoModalProps {
 }
 
 export function DiagnosticoModal({ open, onClose, onAbrirGrade }: DiagnosticoModalProps) {
+  const [termoOrfaos, setTermoOrfaos] = useState('');
   const [skusOrfaos, setSkusOrfaos] = useState<SkuResumo[]>([]);
   const [totalOrfaos, setTotalOrfaos] = useState(0);
   const [paginaOrfaos, setPaginaOrfaos] = useState(1);
   const [carregandoOrfaos, setCarregandoOrfaos] = useState(false);
 
+  const [codigoVazias, setCodigoVazias] = useState<number | null>(null);
+  const [nomeVazias, setNomeVazias] = useState('');
   const [gradesVazias, setGradesVazias] = useState<GradeListItem[]>([]);
   const [carregandoVazias, setCarregandoVazias] = useState(false);
 
   useEffect(() => {
-    if (open) setPaginaOrfaos(1);
+    if (!open) return;
+    setTermoOrfaos('');
+    setPaginaOrfaos(1);
+    setCodigoVazias(null);
+    setNomeVazias('');
   }, [open]);
 
   useEffect(() => {
     if (!open) return;
 
-    (async () => {
+    const timer = setTimeout(async () => {
       try {
         setCarregandoOrfaos(true);
-        const dados = await listarSkusOrfaos(paginaOrfaos, TAMANHO_PAGINA_ORFAOS);
+        const dados = await listarSkusOrfaos(paginaOrfaos, TAMANHO_PAGINA_ORFAOS, termoOrfaos || undefined);
         setSkusOrfaos(dados.itens);
         setTotalOrfaos(dados.total);
       } catch (error) {
@@ -41,24 +49,31 @@ export function DiagnosticoModal({ open, onClose, onAbrirGrade }: DiagnosticoMod
       } finally {
         setCarregandoOrfaos(false);
       }
-    })();
-  }, [open, paginaOrfaos]);
+    }, 350);
+
+    return () => clearTimeout(timer);
+  }, [open, paginaOrfaos, termoOrfaos]);
 
   useEffect(() => {
     if (!open) return;
 
-    (async () => {
+    const timer = setTimeout(async () => {
       try {
         setCarregandoVazias(true);
-        const dados = await listarGradesVazias();
+        const dados = await listarGradesVazias({
+          codigo: codigoVazias ?? undefined,
+          nome: nomeVazias || undefined,
+        });
         setGradesVazias(dados);
       } catch (error) {
         message.error(extrairMensagemErro(error, 'Não foi possível carregar as grades vazias.'));
       } finally {
         setCarregandoVazias(false);
       }
-    })();
-  }, [open]);
+    }, 350);
+
+    return () => clearTimeout(timer);
+  }, [open, codigoVazias, nomeVazias]);
 
   function handleAbrirGrade(codigo: number) {
     onAbrirGrade(codigo);
@@ -96,6 +111,17 @@ export function DiagnosticoModal({ open, onClose, onAbrirGrade }: DiagnosticoMod
             children: (
               <>
                 <Text type="secondary">Produtos sem nenhuma grade vinculada.</Text>
+                <Input
+                  placeholder="Buscar por código do SKU..."
+                  prefix={<SearchOutlined />}
+                  value={termoOrfaos}
+                  onChange={(e) => {
+                    setTermoOrfaos(e.target.value);
+                    setPaginaOrfaos(1);
+                  }}
+                  allowClear
+                  style={{ marginTop: 12 }}
+                />
                 <Table
                   style={{ marginTop: 12 }}
                   size="small"
@@ -120,6 +146,25 @@ export function DiagnosticoModal({ open, onClose, onAbrirGrade }: DiagnosticoMod
             children: (
               <>
                 <Text type="secondary">Grades cadastradas sem nenhum SKU vinculado.</Text>
+                <Row gutter={12} style={{ marginTop: 12 }}>
+                  <Col>
+                    <InputNumber
+                      placeholder="Código"
+                      value={codigoVazias}
+                      onChange={setCodigoVazias}
+                      style={{ width: 120 }}
+                    />
+                  </Col>
+                  <Col flex="1 1 auto">
+                    <Input
+                      placeholder="Buscar por nome da grade..."
+                      prefix={<SearchOutlined />}
+                      value={nomeVazias}
+                      onChange={(e) => setNomeVazias(e.target.value)}
+                      allowClear
+                    />
+                  </Col>
+                </Row>
                 <Table
                   style={{ marginTop: 12 }}
                   size="small"

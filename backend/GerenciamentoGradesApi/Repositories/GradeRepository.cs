@@ -80,9 +80,12 @@ public class GradeRepository : IGradeRepository
             .ToListAsync();
     }
 
-    public async Task<(IEnumerable<SkuResumo> Itens, int Total)> ListarSkusOrfaosAsync(int pagina, int tamanhoPagina)
+    public async Task<(IEnumerable<SkuResumo> Itens, int Total)> ListarSkusOrfaosAsync(string? termo, int pagina, int tamanhoPagina)
     {
         var query = _context.ProdutosMestre.AsNoTracking().Where(p => p.CodigoGradePrecos == null);
+
+        if (!string.IsNullOrWhiteSpace(termo))
+            query = query.Where(p => EF.Functions.Like(p.Codigo.ToString(), termo + "%"));
 
         var total = await query.CountAsync();
 
@@ -96,10 +99,18 @@ public class GradeRepository : IGradeRepository
         return (itens, total);
     }
 
-    public async Task<IEnumerable<GradeListItem>> ListarGradesVaziasAsync()
+    public async Task<IEnumerable<GradeListItem>> ListarGradesVaziasAsync(int? codigo, string? nome)
     {
-        return await _context.Grades.AsNoTracking()
-            .Where(g => !_context.ProdutosMestre.Any(p => p.CodigoGradePrecos == g.Codigo))
+        var query = _context.Grades.AsNoTracking()
+            .Where(g => !_context.ProdutosMestre.Any(p => p.CodigoGradePrecos == g.Codigo));
+
+        if (codigo is not null)
+            query = query.Where(g => g.Codigo == codigo);
+
+        if (!string.IsNullOrWhiteSpace(nome))
+            query = query.Where(g => EF.Functions.Like(g.Nome, "%" + nome + "%"));
+
+        return await query
             .OrderBy(g => g.Codigo)
             .Select(g => new GradeListItem { Codigo = g.Codigo, Nome = g.Nome, Sigla = g.Sigla, QtdSkus = 0 })
             .ToListAsync();
