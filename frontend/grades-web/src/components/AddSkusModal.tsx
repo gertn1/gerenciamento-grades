@@ -96,7 +96,7 @@ export function AddSkusModal({ open, gradeCodigo, onClose, onAdicionados }: AddS
       width={640}
     >
       <Input
-        placeholder="Buscar SKU por código ou descrição..."
+        placeholder="Buscar SKU por código..."
         prefix={<SearchOutlined />}
         value={termo}
         onChange={(e) => setTermo(e.target.value)}

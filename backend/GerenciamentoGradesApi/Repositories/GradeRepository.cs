@@ -70,9 +70,7 @@ public class GradeRepository : IGradeRepository
 
         if (!string.IsNullOrWhiteSpace(termo))
         {
-            query = query.Where(p =>
-                EF.Functions.Like(p.Codigo.ToString(), termo + "%") ||
-                (p.Descricao != null && EF.Functions.Like(p.Descricao, "%" + termo + "%")));
+            query = query.Where(p => EF.Functions.Like(p.Codigo.ToString(), termo + "%"));
         }
 
         return await query
