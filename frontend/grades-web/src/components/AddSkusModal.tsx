@@ -1,9 +1,11 @@
-import { SearchOutlined } from '@ant-design/icons';
-import { Input, Modal, Table, message } from 'antd';
+import { DeleteOutlined, PlusOutlined, SearchOutlined } from '@ant-design/icons';
+import { Button, Divider, Input, Modal, Table, Typography, message } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { useEffect, useState } from 'react';
 import { adicionarSkus, buscarSkusDisponiveis, extrairMensagemErro } from '../api/gradesApi';
 import type { SkuResumo } from '../types/grade';
+
+const { Text } = Typography;
 
 interface AddSkusModalProps {
   open: boolean;
@@ -12,11 +14,15 @@ interface AddSkusModalProps {
   onAdicionados: () => void;
 }
 
+// Busca e seleção ficam separadas: cada resultado da busca só entra na lista
+// de rascunho (`selecionados`) quando o usuário clica em "+". Nada é enviado
+// à API até o clique em "Confirmar" — o rascunho vive só em memória, e cada
+// item tem seu próprio botão de remover pra desfazer uma adição por engano.
 export function AddSkusModal({ open, gradeCodigo, onClose, onAdicionados }: AddSkusModalProps) {
   const [termo, setTermo] = useState('');
   const [resultados, setResultados] = useState<SkuResumo[]>([]);
   const [buscando, setBuscando] = useState(false);
-  const [selecionados, setSelecionados] = useState<string[]>([]);
+  const [selecionados, setSelecionados] = useState<SkuResumo[]>([]);
   const [salvando, setSalvando] = useState(false);
 
   useEffect(() => {
@@ -47,12 +53,23 @@ export function AddSkusModal({ open, gradeCodigo, onClose, onAdicionados }: AddS
     return () => clearTimeout(timer);
   }, [open, gradeCodigo, termo]);
 
-  async function handleAdicionar() {
+  function handleSelecionar(sku: SkuResumo) {
+    setSelecionados((atual) => (atual.some((s) => s.codigo === sku.codigo) ? atual : [...atual, sku]));
+  }
+
+  function handleRemoverSelecionado(codigo: string) {
+    setSelecionados((atual) => atual.filter((s) => s.codigo !== codigo));
+  }
+
+  async function handleConfirmar() {
     if (!gradeCodigo || selecionados.length === 0) return;
 
     try {
       setSalvando(true);
-      const resultado = await adicionarSkus(gradeCodigo, selecionados);
+      const resultado = await adicionarSkus(
+        gradeCodigo,
+        selecionados.map((s) => s.codigo),
+      );
 
       if (resultado.skusRejeitados.length > 0) {
         Modal.warning({
@@ -80,9 +97,45 @@ export function AddSkusModal({ open, gradeCodigo, onClose, onAdicionados }: AddS
     }
   }
 
-  const columns: ColumnsType<SkuResumo> = [
+  const colunasResultados: ColumnsType<SkuResumo> = [
     { title: 'CÓDIGO', dataIndex: 'codigo', width: 110 },
     { title: 'DESCRIÇÃO', dataIndex: 'descricao' },
+    {
+      title: '',
+      width: 48,
+      align: 'center',
+      render: (_, sku) => {
+        const jaSelecionado = selecionados.some((s) => s.codigo === sku.codigo);
+        return (
+          <Button
+            type="text"
+            size="small"
+            icon={<PlusOutlined />}
+            disabled={jaSelecionado}
+            onClick={() => handleSelecionar(sku)}
+          />
+        );
+      },
+    },
+  ];
+
+  const colunasSelecionados: ColumnsType<SkuResumo> = [
+    { title: 'CÓDIGO', dataIndex: 'codigo', width: 110 },
+    { title: 'DESCRIÇÃO', dataIndex: 'descricao' },
+    {
+      title: '',
+      width: 48,
+      align: 'center',
+      render: (_, sku) => (
+        <Button
+          type="text"
+          danger
+          size="small"
+          icon={<DeleteOutlined />}
+          onClick={() => handleRemoverSelecionado(sku.codigo)}
+        />
+      ),
+    },
   ];
 
   return (
@@ -90,9 +143,9 @@ export function AddSkusModal({ open, gradeCodigo, onClose, onAdicionados }: AddS
       title="Adicionar SKUs"
       open={open}
       onCancel={onClose}
-      onOk={handleAdicionar}
+      onOk={handleConfirmar}
       confirmLoading={salvando}
-      okText={`Adicionar${selecionados.length > 0 ? ` (${selecionados.length})` : ''}`}
+      okText={`Confirmar${selecionados.length > 0 ? ` (${selecionados.length})` : ''}`}
       okButtonProps={{ disabled: selecionados.length === 0 }}
       cancelText="Cancelar"
       destroyOnHidden
@@ -110,17 +163,28 @@ export function AddSkusModal({ open, gradeCodigo, onClose, onAdicionados }: AddS
 
       <Table
         size="small"
-        columns={columns}
+        columns={colunasResultados}
         dataSource={resultados}
         rowKey="codigo"
         loading={buscando}
-        pagination={{ pageSize: 8, hideOnSinglePage: true }}
-        scroll={{ y: 320 }}
-        rowSelection={{
-          selectedRowKeys: selecionados,
-          onChange: (keys) => setSelecionados(keys as string[]),
-        }}
+        pagination={{ pageSize: 5, hideOnSinglePage: true }}
+        scroll={{ y: 180 }}
         locale={{ emptyText: termo ? 'Nenhum SKU encontrado.' : 'Digite para buscar SKUs disponíveis.' }}
+      />
+
+      <Divider style={{ margin: '16px 0' }} />
+
+      <Text strong>SKUs selecionados para adicionar ({selecionados.length})</Text>
+
+      <Table
+        style={{ marginTop: 8 }}
+        size="small"
+        columns={colunasSelecionados}
+        dataSource={selecionados}
+        rowKey="codigo"
+        pagination={{ pageSize: 5, hideOnSinglePage: true }}
+        scroll={{ y: 180 }}
+        locale={{ emptyText: 'Nenhum SKU selecionado ainda — use a busca acima.' }}
       />
     </Modal>
   );
