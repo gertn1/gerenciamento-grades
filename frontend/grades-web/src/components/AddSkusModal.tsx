@@ -27,7 +27,10 @@ export function AddSkusModal({ open, gradeCodigo, onClose, onAdicionados }: AddS
   }, [open]);
 
   useEffect(() => {
-    if (!open || !gradeCodigo) return;
+    if (!open || !gradeCodigo || !termo.trim()) {
+      setResultados([]);
+      return;
+    }
 
     const timer = setTimeout(async () => {
       try {
