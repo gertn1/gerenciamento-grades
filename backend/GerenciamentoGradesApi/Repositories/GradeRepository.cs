@@ -185,17 +185,14 @@ public class GradeRepository : IGradeRepository
 
     public async Task<bool> ExcluirAsync(int codigo, string matricula)
     {
+        var grade = await _context.Grades.FirstOrDefaultAsync(g => g.Codigo == codigo);
+        if (grade is null)
+            return false;
+
         await using var transaction = await _context.Database.BeginTransactionAsync();
 
         try
         {
-            var grade = await _context.Grades.FirstOrDefaultAsync(g => g.Codigo == codigo);
-            if (grade is null)
-            {
-                await transaction.RollbackAsync();
-                return false;
-            }
-
             await _context.ProdutosMestre
                 .Where(p => p.CodigoGradePrecos == codigo)
                 .ExecuteUpdateAsync(s => s.SetProperty(p => p.CodigoGradePrecos, (int?)null));
@@ -208,11 +205,12 @@ public class GradeRepository : IGradeRepository
                 TipoOperacao = "DELETE",
                 CodigoGrade = codigo,
                 EstadoAnterior = estadoAnterior,
-                EstadoNovo = null,
+                EstadoNovo = "Deletado",
                 Matricula = matricula
             }, _context);
 
             await _context.SaveChangesAsync();
+
             await transaction.CommitAsync();
             return true;
         }

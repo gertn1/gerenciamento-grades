@@ -146,7 +146,7 @@ public class GradeService : IGradeService
             }
 
             if (vinculo?.CodigoGrade == codigo)
-                continue; // já pertence a esta grade — nada a fazer, mas não é erro
+                continue; 
 
             paraVincular.Add(sku);
         }

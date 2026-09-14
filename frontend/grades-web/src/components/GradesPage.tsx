@@ -253,6 +253,7 @@ export function GradesPage() {
         open={criacaoMassivaAberta}
         title="Criação massiva de grades"
         subtitle="Crie grades e vincule SKUs de uma vez via arquivo Excel."
+        warningText="O código da grade é gerado de forma automática pelo sistema. Preencha somente as colunas informadas no modelo da planilha."
         templateUrl={urlModeloImportacaoMassiva()}
         templateFileName="modelo_criacao_massiva_grades.xlsx"
         onUpload={importacaoMassiva}
@@ -284,7 +285,7 @@ export function GradesPage() {
         open={exclusaoMassivaAberta}
         title="Exclusão massiva de SKUs"
         subtitle="Remova SKUs de múltiplas grades via arquivo Excel."
-        warningText="A grade não será excluída mesmo que todos os seus SKUs sejam removidos pela importação. Ela permanecerá cadastrada no sistema."
+        warningText="A grade não será excluída: ela ficará vazia e os SKUs serão desvinculados."
         templateUrl={urlModeloExclusaoMassivaSkus()}
         templateFileName="modelo_exclusao_massiva_skus.xlsx"
         onUpload={exclusaoMassivaSkus}
