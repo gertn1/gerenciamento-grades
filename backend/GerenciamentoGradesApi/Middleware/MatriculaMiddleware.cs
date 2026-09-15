@@ -4,7 +4,7 @@ namespace GerenciamentoGradesApi.Middleware;
 // requisição que altera dados (POST/PUT/DELETE/PATCH) em /api/grades precisa
 // informar o cabeçalho X-Matricula. O front-end intercepta essas chamadas e
 // pede a matrícula ao usuário antes de completá-las (ver src/auth/matricula.ts).
-public class MatriculaMiddleware
+public class MatriculaMiddleware(RequestDelegate next)
 {
     public const string CabecalhoMatricula = "X-Matricula";
     public const string ChaveContexto = "Matricula";
@@ -13,13 +13,6 @@ public class MatriculaMiddleware
     {
         HttpMethods.Post, HttpMethods.Put, HttpMethods.Delete, HttpMethods.Patch
     };
-
-    private readonly RequestDelegate _next;
-
-    public MatriculaMiddleware(RequestDelegate next)
-    {
-        _next = next;
-    }
 
     public async Task InvokeAsync(HttpContext context)
     {
@@ -43,7 +36,7 @@ public class MatriculaMiddleware
             context.Items[ChaveContexto] = matricula;
         }
 
-        await _next(context);
+        await next(context);
     }
 }
 

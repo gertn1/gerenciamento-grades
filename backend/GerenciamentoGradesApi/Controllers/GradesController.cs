@@ -9,33 +9,28 @@ namespace GerenciamentoGradesApi.Controllers;
 
 // Só orquestra HTTP: recebe a requisição, chama o serviço e traduz o
 // resultado em IActionResult. Nenhuma regra de negócio deve morar aqui —
-// isso vive em Services/GradeService e Services/PlanilhaGradeService.
+// isso vive em Services/GradeService, Services/PlanilhaGradeService e
+// Services/ExportacaoDiagnosticoService.
 [ApiController]
 [Route("api/grades")]
-public class GradesController : ControllerBase
+public class GradesController(
+    IGradeService gradeService,
+    IPlanilhaGradeService planilhaGradeService,
+    IExportacaoDiagnosticoService exportacaoDiagnosticoService) : ControllerBase
 {
-    private readonly IGradeService _gradeService;
-    private readonly IPlanilhaGradeService _planilhaGradeService;
-
-    public GradesController(IGradeService gradeService, IPlanilhaGradeService planilhaGradeService)
-    {
-        _gradeService = gradeService;
-        _planilhaGradeService = planilhaGradeService;
-    }
-
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<GradeListItemResponse>>> Listar([FromQuery] int? codigo, [FromQuery] string? nome)
+    public async Task<ActionResult<IEnumerable<GradeListItemResponse>>> Listar([FromQuery] int? codigoGrade, [FromQuery] string? nome)
     {
-        var grades = await _gradeService.ListarAsync(codigo, nome);
+        var grades = await gradeService.ListarAsync(codigoGrade, nome);
         return Ok(grades);
     }
 
-    [HttpGet("{codigo:int}")]
-    public async Task<ActionResult<GradeDetalheResponse>> ObterDetalhe(int codigo)
+    [HttpGet("{codigoGrade:int}")]
+    public async Task<ActionResult<GradeDetalheResponse>> ObterDetalhe(int codigoGrade)
     {
-        var detalhe = await _gradeService.ObterDetalheAsync(codigo);
+        var detalhe = await gradeService.ObterDetalheAsync(codigoGrade);
         if (detalhe is null)
-            return NotFound(new { mensagem = $"Grade {codigo} não encontrada." });
+            return NotFound(new { mensagem = $"Grade {codigoGrade} não encontrada." });
 
         return Ok(detalhe);
     }
@@ -47,44 +42,59 @@ public class GradesController : ControllerBase
         if (pagina < 1) pagina = 1;
         if (tamanhoPagina is < 1 or > 100) tamanhoPagina = 20;
 
-        var resultado = await _gradeService.ListarSkusOrfaosAsync(termo, pagina, tamanhoPagina);
+        var resultado = await gradeService.ListarSkusOrfaosAsync(termo, pagina, tamanhoPagina);
         return Ok(resultado);
+    }
+
+    [HttpGet("skus-orfaos/exportar")]
+    [ProducesResponseType(typeof(FileResult), StatusCodes.Status200OK, "text/csv")]
+    public IResult ExportarSkusOrfaosCsv([FromQuery] string? termo)
+    {
+        var nomeArquivo = $"skus_orfaos_{DateTime.Now:yyyyMMdd_HHmmss}.csv";
+
+        // Results.Stream escreve no corpo da resposta à medida que as linhas
+        // saem do banco — o arquivo nunca é montado inteiro em memória (a lista
+        // de órfãos pode ter centenas de milhares de produtos).
+        return Results.Stream(
+            destino => exportacaoDiagnosticoService.EscreverSkusOrfaosCsvAsync(destino, termo, HttpContext.RequestAborted),
+            contentType: "text/csv; charset=utf-8",
+            fileDownloadName: nomeArquivo);
     }
 
     [HttpGet("grades-vazias")]
     public async Task<ActionResult<IEnumerable<GradeListItemResponse>>> ListarGradesVazias(
-        [FromQuery] int? codigo, [FromQuery] string? nome)
+        [FromQuery] int? codigoGrade, [FromQuery] string? nome)
     {
-        var grades = await _gradeService.ListarGradesVaziasAsync(codigo, nome);
+        var grades = await gradeService.ListarGradesVaziasAsync(codigoGrade, nome);
         return Ok(grades);
     }
 
-    [HttpGet("{codigo:int}/skus-disponiveis")]
-    public async Task<ActionResult<IEnumerable<SkuResumoResponse>>> BuscarSkusDisponiveis(int codigo, [FromQuery] string? termo)
+    [HttpGet("{codigoGrade:int}/skus-disponiveis")]
+    public async Task<ActionResult<IEnumerable<SkuResumoResponse>>> BuscarSkusDisponiveis(int codigoGrade, [FromQuery] string? termo)
     {
-        var skus = await _gradeService.BuscarSkusDisponiveisAsync(codigo, termo);
+        var skus = await gradeService.BuscarSkusDisponiveisAsync(codigoGrade, termo);
         if (skus is null)
-            return NotFound(new { mensagem = $"Grade {codigo} não encontrada." });
+            return NotFound(new { mensagem = $"Grade {codigoGrade} não encontrada." });
 
         return Ok(skus);
     }
 
-    [HttpPost("{codigo:int}/skus")]
-    public async Task<ActionResult<AtualizarSkusResponse>> AdicionarSkus(int codigo, [FromBody] SkusRequest request)
+    [HttpPost("{codigoGrade:int}/skus")]
+    public async Task<ActionResult<AtualizarSkusResponse>> AdicionarSkus(int codigoGrade, [FromBody] SkusRequest request)
     {
-        var resultado = await _gradeService.AdicionarSkusAsync(codigo, request.Skus, HttpContext.ObterMatricula());
+        var resultado = await gradeService.AdicionarSkusAsync(codigoGrade, request.Skus, HttpContext.ObterMatricula());
         if (resultado is null)
-            return NotFound(new { mensagem = $"Grade {codigo} não encontrada." });
+            return NotFound(new { mensagem = $"Grade {codigoGrade} não encontrada." });
 
         return Ok(resultado);
     }
 
-    [HttpPost("{codigo:int}/skus/remover")]
-    public async Task<ActionResult<AtualizarSkusResponse>> RemoverSkus(int codigo, [FromBody] SkusRequest request)
+    [HttpPost("{codigoGrade:int}/skus/remover")]
+    public async Task<ActionResult<AtualizarSkusResponse>> RemoverSkus(int codigoGrade, [FromBody] SkusRequest request)
     {
-        var resultado = await _gradeService.RemoverSkusAsync(codigo, request.Skus, HttpContext.ObterMatricula());
+        var resultado = await gradeService.RemoverSkusAsync(codigoGrade, request.Skus, HttpContext.ObterMatricula());
         if (resultado is null)
-            return NotFound(new { mensagem = $"Grade {codigo} não encontrada." });
+            return NotFound(new { mensagem = $"Grade {codigoGrade} não encontrada." });
 
         return Ok(resultado);
     }
@@ -92,20 +102,20 @@ public class GradesController : ControllerBase
     [HttpPost]
     public async Task<ActionResult<GradeResponse>> Criar([FromBody] CriarGradeRequest request)
     {
-        var resultado = await _gradeService.CriarAsync(request, HttpContext.ObterMatricula());
+        var resultado = await gradeService.CriarAsync(request, HttpContext.ObterMatricula());
 
         return resultado.Status switch
         {
-            StatusOperacao.Sucesso => CreatedAtAction(nameof(ObterDetalhe), new { codigo = resultado.Valor!.Codigo }, resultado.Valor),
+            StatusOperacao.Sucesso => CreatedAtAction(nameof(ObterDetalhe), new { codigoGrade = resultado.Valor!.CodigoGrade }, resultado.Valor),
             StatusOperacao.Conflito => Conflict(new { mensagem = resultado.MensagemErro }),
             _ => Problem(resultado.MensagemErro)
         };
     }
 
-    [HttpPut("{codigo:int}")]
-    public async Task<ActionResult<GradeResponse>> Atualizar(int codigo, [FromBody] AtualizarGradeRequest request)
+    [HttpPut("{codigoGrade:int}")]
+    public async Task<ActionResult<GradeResponse>> Atualizar(int codigoGrade, [FromBody] AtualizarGradeRequest request)
     {
-        var resultado = await _gradeService.AtualizarAsync(codigo, request, HttpContext.ObterMatricula());
+        var resultado = await gradeService.AtualizarAsync(codigoGrade, request, HttpContext.ObterMatricula());
 
         return resultado.Status switch
         {
@@ -116,12 +126,12 @@ public class GradesController : ControllerBase
         };
     }
 
-    [HttpDelete("{codigo:int}")]
-    public async Task<IActionResult> Excluir(int codigo)
+    [HttpDelete("{codigoGrade:int}")]
+    public async Task<IActionResult> Excluir(int codigoGrade)
     {
-        var excluido = await _gradeService.ExcluirAsync(codigo, HttpContext.ObterMatricula());
+        var excluido = await gradeService.ExcluirAsync(codigoGrade, HttpContext.ObterMatricula());
         if (!excluido)
-            return NotFound(new { mensagem = $"Grade {codigo} não encontrada." });
+            return NotFound(new { mensagem = $"Grade {codigoGrade} não encontrada." });
 
         return NoContent();
     }
@@ -129,14 +139,14 @@ public class GradesController : ControllerBase
     [HttpGet("importacao-massiva/modelo")]
     public IActionResult BaixarModeloImportacaoMassiva()
     {
-        var arquivo = _planilhaGradeService.GerarModeloImportacaoMassiva();
+        var arquivo = planilhaGradeService.GerarModeloImportacaoMassiva();
         return File(arquivo, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "modelo_criacao_massiva_grades.xlsx");
     }
 
     [HttpGet("exclusao-massiva-skus/modelo")]
     public IActionResult BaixarModeloExclusaoMassivaSkus()
     {
-        var arquivo = _planilhaGradeService.GerarModeloExclusaoMassivaSkus();
+        var arquivo = planilhaGradeService.GerarModeloExclusaoMassivaSkus();
         return File(arquivo, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "modelo_exclusao_massiva_skus.xlsx");
     }
 
@@ -147,7 +157,7 @@ public class GradesController : ControllerBase
         if (file is null || file.Length == 0)
             return BadRequest(new { mensagem = "Nenhum arquivo enviado." });
 
-        var resultado = await _planilhaGradeService.ImportarAsync(file.OpenReadStream(), file.FileName, HttpContext.ObterMatricula());
+        var resultado = await planilhaGradeService.ImportarAsync(file.OpenReadStream(), file.FileName, HttpContext.ObterMatricula());
 
         return resultado.Status switch
         {
@@ -164,7 +174,7 @@ public class GradesController : ControllerBase
         if (file is null || file.Length == 0)
             return BadRequest(new { mensagem = "Nenhum arquivo enviado." });
 
-        var resultado = await _planilhaGradeService.AtualizarEmMassaAsync(file.OpenReadStream(), file.FileName, HttpContext.ObterMatricula());
+        var resultado = await planilhaGradeService.AtualizarEmMassaAsync(file.OpenReadStream(), file.FileName, HttpContext.ObterMatricula());
 
         return resultado.Status switch
         {
@@ -181,7 +191,7 @@ public class GradesController : ControllerBase
         if (file is null || file.Length == 0)
             return BadRequest(new { mensagem = "Nenhum arquivo enviado." });
 
-        var resultado = await _planilhaGradeService.ExcluirSkusEmMassaAsync(file.OpenReadStream(), file.FileName, HttpContext.ObterMatricula());
+        var resultado = await planilhaGradeService.ExcluirSkusEmMassaAsync(file.OpenReadStream(), file.FileName, HttpContext.ObterMatricula());
 
         return resultado.Status switch
         {

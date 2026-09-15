@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { excluirGrade, extrairMensagemErro } from '../api/gradesApi';
 
 interface GradeParaExclusao {
-  codigo: number;
+  codigoGrade: number;
   nome: string;
   qtdSkus: number;
 }
@@ -24,7 +24,7 @@ export function GradeDeleteModal({ open, grade, onClose, onDeleted }: GradeDelet
 
     try {
       setExcluindo(true);
-      await excluirGrade(grade.codigo);
+      await excluirGrade(grade.codigoGrade);
       message.success('Grade excluída com sucesso.');
       onDeleted();
     } catch (error) {
@@ -52,7 +52,7 @@ export function GradeDeleteModal({ open, grade, onClose, onDeleted }: GradeDelet
         {grade && (
           <>
             <p>
-              A grade <strong>#{grade.codigo} — {grade.nome}</strong> será excluída permanentemente.
+              A grade <strong>#{grade.codigoGrade} — {grade.nome}</strong> será excluída permanentemente.
             </p>
             <p>
               Os <strong>{grade.qtdSkus} SKU(s)</strong> vinculados perderão o vínculo e ficarão sem grade.

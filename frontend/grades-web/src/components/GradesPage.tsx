@@ -44,7 +44,7 @@ export function GradesPage() {
   const [detalheRefreshKey, setDetalheRefreshKey] = useState(0);
 
   const [exclusaoAberta, setExclusaoAberta] = useState(false);
-  const [gradeParaExcluir, setGradeParaExcluir] = useState<{ codigo: number; nome: string; qtdSkus: number } | null>(
+  const [gradeParaExcluir, setGradeParaExcluir] = useState<{ codigoGrade: number; nome: string; qtdSkus: number } | null>(
     null,
   );
 
@@ -57,7 +57,7 @@ export function GradesPage() {
     try {
       setCarregando(true);
       const dados = await listarGrades({
-        codigo: filtroCodigo ?? undefined,
+        codigoGrade: filtroCodigo ?? undefined,
         nome: filtroNome || undefined,
       });
       setGrades(dados);
@@ -75,7 +75,7 @@ export function GradesPage() {
   const columns: ColumnsType<GradeListItem> = [
     {
       title: 'CÓDIGO',
-      dataIndex: 'codigo',
+      dataIndex: 'codigoGrade',
       width: 110,
       render: (codigo: number) => (
         <span
@@ -110,7 +110,7 @@ export function GradesPage() {
             type="text"
             icon={<EyeOutlined />}
             onClick={() => {
-              setCodigoDetalhe(grade.codigo);
+              setCodigoDetalhe(grade.codigoGrade);
               setDetalheAberto(true);
             }}
           />
@@ -205,7 +205,7 @@ export function GradesPage() {
             style={{ marginTop: 12 }}
             columns={columns}
             dataSource={grades}
-            rowKey="codigo"
+            rowKey="codigoGrade"
             loading={carregando}
             pagination={{ pageSize: 10, hideOnSinglePage: true }}
           />
@@ -233,7 +233,7 @@ export function GradesPage() {
           setFormAberto(true);
         }}
         onExcluirGrade={(grade) => {
-          setGradeParaExcluir({ codigo: grade.codigo, nome: grade.nome, qtdSkus: grade.skus.length });
+          setGradeParaExcluir({ codigoGrade: grade.codigoGrade, nome: grade.nome, qtdSkus: grade.skus.length });
           setExclusaoAberta(true);
         }}
       />

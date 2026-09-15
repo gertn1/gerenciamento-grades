@@ -61,7 +61,7 @@ export function GradeDetailModal({
 
     try {
       setRemovendo(true);
-      const resultado = await removerSkus(detalhe.codigo, skus);
+      const resultado = await removerSkus(detalhe.codigoGrade, skus);
       setDetalhe(resultado.grade);
       setSelecionados((atual) => atual.filter((sku) => !skus.includes(sku)));
       message.success(`${skus.length} SKU(s) removido(s) da grade.`);
@@ -88,14 +88,14 @@ export function GradeDetailModal({
     const termo = filtro.trim().toLowerCase();
     if (!termo) return detalhe.skus;
     return detalhe.skus.filter(
-      (sku) => sku.codigo.toLowerCase().includes(termo) || sku.descricao.toLowerCase().includes(termo),
+      (sku) => sku.codigoSku.toLowerCase().includes(termo) || sku.descricao.toLowerCase().includes(termo),
     );
   }, [detalhe, filtro]);
 
   const columns: ColumnsType<SkuResumo> = [
     {
       title: 'CÓDIGO',
-      dataIndex: 'codigo',
+      dataIndex: 'codigoSku',
       width: 110,
       render: (codigo: string) => <Text code>{codigo}</Text>,
     },
@@ -105,7 +105,7 @@ export function GradeDetailModal({
       width: 48,
       align: 'center',
       render: (_, sku) => (
-        <Button type="text" danger size="small" icon={<DeleteOutlined />} onClick={() => confirmarRemocao([sku.codigo])} />
+        <Button type="text" danger size="small" icon={<DeleteOutlined />} onClick={() => confirmarRemocao([sku.codigoSku])} />
       ),
     },
   ];
@@ -139,7 +139,7 @@ export function GradeDetailModal({
         {!carregando && detalhe && (
           <>
             <Text type="secondary">
-              Código {detalhe.codigo} · Sigla: {detalhe.sigla}
+              Código {detalhe.codigoGrade} · Sigla: {detalhe.sigla}
             </Text>
 
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 20, marginBottom: 8 }}>
@@ -175,7 +175,7 @@ export function GradeDetailModal({
                 size="small"
                 columns={columns}
                 dataSource={skusFiltrados}
-                rowKey="codigo"
+                rowKey="codigoSku"
                 loading={removendo}
                 pagination={{ pageSize: 10, hideOnSinglePage: true }}
                 rowSelection={{
@@ -190,7 +190,7 @@ export function GradeDetailModal({
 
       <AddSkusModal
         open={adicionarAberto}
-        gradeCodigo={detalhe?.codigo ?? null}
+        gradeCodigo={detalhe?.codigoGrade ?? null}
         onClose={() => setAdicionarAberto(false)}
         onAdicionados={() => {
           setAdicionarAberto(false);

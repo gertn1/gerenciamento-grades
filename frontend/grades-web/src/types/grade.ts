@@ -1,5 +1,5 @@
 export interface Grade {
-  codigo: number;
+  codigoGrade: number;
   nome: string;
   sigla: string;
 }
@@ -9,7 +9,7 @@ export interface GradeListItem extends Grade {
 }
 
 export interface SkuResumo {
-  codigo: string;
+  codigoSku: string;
   descricao: string;
 }
 

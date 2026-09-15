@@ -21,7 +21,7 @@ export function GradeFormModal({ open, grade, onClose, onSaved }: GradeFormModal
       setSalvando(true);
 
       if (editando && grade) {
-        await atualizarGrade(grade.codigo, valores);
+        await atualizarGrade(grade.codigoGrade, valores);
         message.success('Grade atualizada com sucesso.');
       } else {
         await criarGrade(valores);
@@ -57,7 +57,7 @@ export function GradeFormModal({ open, grade, onClose, onSaved }: GradeFormModal
         initialValues={{ nome: grade?.nome ?? '', sigla: grade?.sigla ?? '' }}
       >
         <Form.Item label="Código sequencial">
-          <Input value={grade?.codigo ? String(grade.codigo) : ''} placeholder="— gerado automaticamente —" disabled readOnly />
+          <Input value={grade?.codigoGrade ? String(grade.codigoGrade) : ''} placeholder="— gerado automaticamente —" disabled readOnly />
         </Form.Item>
 
         <Form.Item

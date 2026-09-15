@@ -6,15 +6,8 @@ using GerenciamentoGradesApi.Services.Resultados;
 
 namespace GerenciamentoGradesApi.Services;
 
-public class PlanilhaGradeService : IPlanilhaGradeService
+public class PlanilhaGradeService(IGradeRepository gradeRepository) : IPlanilhaGradeService
 {
-    private readonly IGradeRepository _gradeRepository;
-
-    public PlanilhaGradeService(IGradeRepository gradeRepository)
-    {
-        _gradeRepository = gradeRepository;
-    }
-
     public byte[] GerarModeloImportacaoMassiva()
     {
         using var workbook = new XLWorkbook();
@@ -80,12 +73,7 @@ public class PlanilhaGradeService : IPlanilhaGradeService
         var (linhasValidas, errosValidacao) = ValidarLinhasImportacao(linhas);
         var (sucesso, errosProcessamento) = await ProcessarVinculosAsync(linhasValidas, permiteCriarNovaGrade, matricula);
 
-        var resultado = new ImportacaoResultResponse
-        {
-            TotalLinhas = linhas.Count,
-            Sucesso = sucesso,
-            Erros = [.. errosValidacao, .. errosProcessamento]
-        };
+        var resultado = new ImportacaoResultResponse(linhas.Count, sucesso, [.. errosValidacao, .. errosProcessamento]);
 
         return ResultadoOperacao<ImportacaoResultResponse>.ComSucesso(resultado);
     }
@@ -99,19 +87,19 @@ public class PlanilhaGradeService : IPlanilhaGradeService
         {
             if (string.IsNullOrWhiteSpace(linha.Sku) || string.IsNullOrWhiteSpace(linha.GradeNome) || string.IsNullOrWhiteSpace(linha.Sigla))
             {
-                erros.Add(new ErroLinhaResponse { Linha = linha.Linha, Mensagem = "SKU, NOME_GRADE e SIGLA são obrigatórios." });
+                erros.Add(new ErroLinhaResponse(linha.Linha, "SKU, NOME_GRADE e SIGLA são obrigatórios."));
                 continue;
             }
 
             if (linha.GradeNome.Length > 80)
             {
-                erros.Add(new ErroLinhaResponse { Linha = linha.Linha, Mensagem = "NOME_GRADE deve ter no máximo 80 caracteres." });
+                erros.Add(new ErroLinhaResponse(linha.Linha, "NOME_GRADE deve ter no máximo 80 caracteres."));
                 continue;
             }
 
             if (linha.Sigla.Length > 15)
             {
-                erros.Add(new ErroLinhaResponse { Linha = linha.Linha, Mensagem = "SIGLA deve ter no máximo 15 caracteres." });
+                erros.Add(new ErroLinhaResponse(linha.Linha, "SIGLA deve ter no máximo 15 caracteres."));
                 continue;
             }
 
@@ -130,7 +118,7 @@ public class PlanilhaGradeService : IPlanilhaGradeService
         List<LinhaImportacao> linhasValidas, bool permiteCriarNovaGrade, string matricula)
     {
         var erros = new List<ErroLinhaResponse>();
-        var skusExistentes = await _gradeRepository.FiltrarSkusExistentesAsync(linhasValidas.Select(l => l.Sku));
+        var skusExistentes = await gradeRepository.FiltrarSkusExistentesAsync(linhasValidas.Select(l => l.Sku));
 
         var itensPorGrade = new Dictionary<string, List<LinhaImportacao>>(StringComparer.OrdinalIgnoreCase);
 
@@ -138,7 +126,7 @@ public class PlanilhaGradeService : IPlanilhaGradeService
         {
             if (!skusExistentes.Contains(linha.Sku))
             {
-                erros.Add(new ErroLinhaResponse { Linha = linha.Linha, Mensagem = $"SKU {linha.Sku} não encontrado." });
+                erros.Add(new ErroLinhaResponse(linha.Linha, $"SKU {linha.Sku} não encontrado."));
                 continue;
             }
 
@@ -157,7 +145,7 @@ public class PlanilhaGradeService : IPlanilhaGradeService
         // atual do banco e é atualizado a cada grupo processado, para também
         // pegar o caso de duas linhas do MESMO arquivo disputando o mesmo SKU
         // para grades diferentes.
-        var vinculos = await _gradeRepository.ObterVinculoAtualAsync(skusExistentes);
+        var vinculos = await gradeRepository.ObterVinculoAtualAsync(skusExistentes);
         var vinculoEfetivo = vinculos.ToDictionary(kv => kv.Key, kv => kv.Value.CodigoGrade, StringComparer.OrdinalIgnoreCase);
         var nomesGradeCache = new Dictionary<int, string?>();
 
@@ -165,7 +153,7 @@ public class PlanilhaGradeService : IPlanilhaGradeService
         {
             if (!nomesGradeCache.TryGetValue(codigoGrade, out var nome))
             {
-                var grade = await _gradeRepository.ObterPorCodigoAsync(codigoGrade);
+                var grade = await gradeRepository.ObterPorCodigoAsync(codigoGrade);
                 nome = grade?.Nome;
                 nomesGradeCache[codigoGrade] = nome;
             }
@@ -182,11 +170,9 @@ public class PlanilhaGradeService : IPlanilhaGradeService
             var siglasDaGrade = itens.Select(i => i.Sigla).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
             if (siglasDaGrade.Count > 1)
             {
-                erros.AddRange(itens.Select(i => new ErroLinhaResponse
-                {
-                    Linha = i.Linha,
-                    Mensagem = $"NOME_GRADE '{gradeNome}' aparece com siglas diferentes na planilha ({string.Join(", ", siglasDaGrade)})."
-                }));
+                erros.AddRange(itens.Select(i => new ErroLinhaResponse(
+                    i.Linha,
+                    $"NOME_GRADE '{gradeNome}' aparece com siglas diferentes na planilha ({string.Join(", ", siglasDaGrade)}).")));
                 continue;
             }
 
@@ -199,17 +185,17 @@ public class PlanilhaGradeService : IPlanilhaGradeService
 
             foreach (var sku in itens.Select(i => i.Sku).Distinct())
             {
-                vinculoEfetivo.TryGetValue(sku, out var codigoAtual);
+                vinculoEfetivo.TryGetValue(sku, out var codigoGradeAtual);
 
-                if (codigoAtual is int codigo && codigo != codigoGrade.Value)
+                if (codigoGradeAtual is int codigoGradeVinculada && codigoGradeVinculada != codigoGrade.Value)
                     bloqueados.Add(sku);
-                else if (codigoAtual != codigoGrade.Value)
+                else if (codigoGradeAtual != codigoGrade.Value)
                     paraVincular.Add(sku);
             }
 
             if (paraVincular.Count > 0)
             {
-                await _gradeRepository.VincularSkusAsync(codigoGrade.Value, paraVincular, matricula);
+                await gradeRepository.VincularSkusAsync(codigoGrade.Value, paraVincular, matricula);
                 foreach (var sku in paraVincular)
                     vinculoEfetivo[sku] = codigoGrade.Value;
             }
@@ -222,14 +208,12 @@ public class PlanilhaGradeService : IPlanilhaGradeService
                     continue;
                 }
 
-                var codigoBloqueio = vinculoEfetivo.GetValueOrDefault(linha.Sku);
-                var nomeBloqueio = codigoBloqueio is int cb ? await ObterNomeGradeAsync(cb) : null;
+                var codigoGradeBloqueio = vinculoEfetivo.GetValueOrDefault(linha.Sku);
+                var nomeGradeBloqueio = codigoGradeBloqueio is int cb ? await ObterNomeGradeAsync(cb) : null;
 
-                erros.Add(new ErroLinhaResponse
-                {
-                    Linha = linha.Linha,
-                    Mensagem = $"SKU {linha.Sku} já está vinculado à grade {codigoBloqueio} - {nomeBloqueio}."
-                });
+                erros.Add(new ErroLinhaResponse(
+                    linha.Linha,
+                    $"SKU {linha.Sku} já está vinculado à grade {codigoGradeBloqueio} - {nomeGradeBloqueio}."));
             }
         }
 
@@ -244,7 +228,7 @@ public class PlanilhaGradeService : IPlanilhaGradeService
         string gradeNome, string siglaGrade, bool permiteCriarNovaGrade, string matricula,
         List<LinhaImportacao> itens, List<ErroLinhaResponse> erros)
     {
-        var gradeExistente = await _gradeRepository.ObterPorNomeAsync(gradeNome);
+        var gradeExistente = await gradeRepository.ObterPorNomeAsync(gradeNome);
 
         if (gradeExistente is not null)
         {
@@ -252,11 +236,9 @@ public class PlanilhaGradeService : IPlanilhaGradeService
             // alterá-la silenciosamente; se divergir da sigla real, é erro.
             if (!string.Equals(gradeExistente.Sigla, siglaGrade, StringComparison.OrdinalIgnoreCase))
             {
-                erros.AddRange(itens.Select(i => new ErroLinhaResponse
-                {
-                    Linha = i.Linha,
-                    Mensagem = $"NOME_GRADE '{gradeNome}' já existe com a sigla '{gradeExistente.Sigla}' — a sigla informada '{siglaGrade}' diverge."
-                }));
+                erros.AddRange(itens.Select(i => new ErroLinhaResponse(
+                    i.Linha,
+                    $"NOME_GRADE '{gradeNome}' já existe com a sigla '{gradeExistente.Sigla}' — a sigla informada '{siglaGrade}' diverge.")));
                 return null;
             }
 
@@ -265,29 +247,25 @@ public class PlanilhaGradeService : IPlanilhaGradeService
 
         if (!permiteCriarNovaGrade)
         {
-            erros.AddRange(itens.Select(i => new ErroLinhaResponse
-            {
-                Linha = i.Linha,
-                Mensagem = $"NOME_GRADE '{gradeNome}' não encontrada — esta importação só atualiza SKUs de grades já existentes."
-            }));
+            erros.AddRange(itens.Select(i => new ErroLinhaResponse(
+                i.Linha,
+                $"NOME_GRADE '{gradeNome}' não encontrada — esta importação só atualiza SKUs de grades já existentes.")));
             return null;
         }
 
         // Grade nova — a sigla não pode colidir com a de uma grade diferente
         // já existente (mesma regra aplicada na criação individual, ver
         // GradeService.CriarAsync).
-        var conflito = await _gradeRepository.ObterPorNomeOuSiglaAsync(gradeNome, siglaGrade);
+        var conflito = await gradeRepository.ObterPorNomeOuSiglaAsync(gradeNome, siglaGrade);
         if (conflito is not null)
         {
-            erros.AddRange(itens.Select(i => new ErroLinhaResponse
-            {
-                Linha = i.Linha,
-                Mensagem = $"SIGLA '{siglaGrade}' já está em uso pela grade {conflito.Codigo} - {conflito.Nome}."
-            }));
+            erros.AddRange(itens.Select(i => new ErroLinhaResponse(
+                i.Linha,
+                $"SIGLA '{siglaGrade}' já está em uso pela grade {conflito.Codigo} - {conflito.Nome}.")));
             return null;
         }
 
-        return await _gradeRepository.CriarAsync(gradeNome, siglaGrade, matricula);
+        return await gradeRepository.CriarAsync(gradeNome, siglaGrade, matricula);
     }
 
     public async Task<ResultadoOperacao<ImportacaoResultResponse>> ExcluirSkusEmMassaAsync(Stream conteudoArquivo, string nomeArquivo, string matricula)
@@ -316,13 +294,13 @@ public class PlanilhaGradeService : IPlanilhaGradeService
         {
             if (string.IsNullOrWhiteSpace(linha.Sku))
             {
-                erros.Add(new ErroLinhaResponse { Linha = linha.Linha, Mensagem = "SKU é obrigatório." });
+                erros.Add(new ErroLinhaResponse(linha.Linha, "SKU é obrigatório."));
                 continue;
             }
 
             if (!int.TryParse(linha.Grade, out var codigoGrade))
             {
-                erros.Add(new ErroLinhaResponse { Linha = linha.Linha, Mensagem = $"GRADE '{linha.Grade}' inválida — informe o código numérico da grade." });
+                erros.Add(new ErroLinhaResponse(linha.Linha, $"GRADE '{linha.Grade}' inválida — informe o código numérico da grade."));
                 continue;
             }
 
@@ -338,33 +316,28 @@ public class PlanilhaGradeService : IPlanilhaGradeService
         var sucesso = 0;
         foreach (var (codigoGrade, itens) in itensPorGrade)
         {
-            var grade = await _gradeRepository.ObterPorCodigoAsync(codigoGrade);
+            var grade = await gradeRepository.ObterPorCodigoAsync(codigoGrade);
             if (grade is null)
             {
-                erros.AddRange(itens.Select(i => new ErroLinhaResponse { Linha = i.Linha, Mensagem = $"Grade {codigoGrade} não encontrada." }));
+                erros.AddRange(itens.Select(i => new ErroLinhaResponse(i.Linha, $"Grade {codigoGrade} não encontrada.")));
                 continue;
             }
 
             var skus = itens.Select(i => i.Sku).Distinct().ToList();
-            var vinculados = await _gradeRepository.FiltrarSkusVinculadosAsync(codigoGrade, skus);
+            var vinculados = await gradeRepository.FiltrarSkusVinculadosAsync(codigoGrade, skus);
 
             erros.AddRange(itens
                 .Where(i => !vinculados.Contains(i.Sku))
-                .Select(i => new ErroLinhaResponse { Linha = i.Linha, Mensagem = $"SKU {i.Sku} não está vinculado à grade {codigoGrade}." }));
+                .Select(i => new ErroLinhaResponse(i.Linha, $"SKU {i.Sku} não está vinculado à grade {codigoGrade}.")));
 
             if (vinculados.Count > 0)
             {
-                await _gradeRepository.DesvincularSkusAsync(codigoGrade, vinculados, matricula);
+                await gradeRepository.DesvincularSkusAsync(codigoGrade, vinculados, matricula);
                 sucesso += itens.Count(i => vinculados.Contains(i.Sku));
             }
         }
 
-        var resultado = new ImportacaoResultResponse
-        {
-            TotalLinhas = linhas.Count,
-            Sucesso = sucesso,
-            Erros = erros
-        };
+        var resultado = new ImportacaoResultResponse(linhas.Count, sucesso, erros);
 
         return ResultadoOperacao<ImportacaoResultResponse>.ComSucesso(resultado);
     }

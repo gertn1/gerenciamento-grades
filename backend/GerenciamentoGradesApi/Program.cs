@@ -26,6 +26,7 @@ builder.Services.AddScoped<IGradeRepository, GradeRepository>();
 builder.Services.AddScoped<IAuditoriaRepository, AuditoriaRepository>();
 builder.Services.AddScoped<IGradeService, GradeService>();
 builder.Services.AddScoped<IPlanilhaGradeService, PlanilhaGradeService>();
+builder.Services.AddScoped<IExportacaoDiagnosticoService, ExportacaoDiagnosticoService>();
 
 var app = builder.Build();
 

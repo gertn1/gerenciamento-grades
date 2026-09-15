@@ -2,13 +2,11 @@ using System.ComponentModel.DataAnnotations;
 
 namespace GerenciamentoGradesApi.Dtos.Requests;
 
-public class AtualizarGradeRequest
-{
+public record AtualizarGradeRequest(
     [Required(ErrorMessage = "Nome é obrigatório.")]
     [MaxLength(80, ErrorMessage = "Nome deve ter no máximo 80 caracteres.")]
-    public string Nome { get; set; } = string.Empty;
+    string Nome,
 
     [Required(ErrorMessage = "Sigla é obrigatória.")]
     [MaxLength(15, ErrorMessage = "Sigla deve ter no máximo 15 caracteres.")]
-    public string Sigla { get; set; } = string.Empty;
-}
+    string Sigla);

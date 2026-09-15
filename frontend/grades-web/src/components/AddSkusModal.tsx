@@ -54,11 +54,11 @@ export function AddSkusModal({ open, gradeCodigo, onClose, onAdicionados }: AddS
   }, [open, gradeCodigo, termo]);
 
   function handleSelecionar(sku: SkuResumo) {
-    setSelecionados((atual) => (atual.some((s) => s.codigo === sku.codigo) ? atual : [...atual, sku]));
+    setSelecionados((atual) => (atual.some((s) => s.codigoSku === sku.codigoSku) ? atual : [...atual, sku]));
   }
 
-  function handleRemoverSelecionado(codigo: string) {
-    setSelecionados((atual) => atual.filter((s) => s.codigo !== codigo));
+  function handleRemoverSelecionado(codigoSku: string) {
+    setSelecionados((atual) => atual.filter((s) => s.codigoSku !== codigoSku));
   }
 
   async function handleConfirmar() {
@@ -68,7 +68,7 @@ export function AddSkusModal({ open, gradeCodigo, onClose, onAdicionados }: AddS
       setSalvando(true);
       const resultado = await adicionarSkus(
         gradeCodigo,
-        selecionados.map((s) => s.codigo),
+        selecionados.map((s) => s.codigoSku),
       );
 
       if (resultado.skusRejeitados.length > 0) {
@@ -98,14 +98,14 @@ export function AddSkusModal({ open, gradeCodigo, onClose, onAdicionados }: AddS
   }
 
   const colunasResultados: ColumnsType<SkuResumo> = [
-    { title: 'CÓDIGO', dataIndex: 'codigo', width: 110 },
+    { title: 'CÓDIGO', dataIndex: 'codigoSku', width: 110 },
     { title: 'DESCRIÇÃO', dataIndex: 'descricao' },
     {
       title: '',
       width: 48,
       align: 'center',
       render: (_, sku) => {
-        const jaSelecionado = selecionados.some((s) => s.codigo === sku.codigo);
+        const jaSelecionado = selecionados.some((s) => s.codigoSku === sku.codigoSku);
         return (
           <Button
             type="text"
@@ -120,7 +120,7 @@ export function AddSkusModal({ open, gradeCodigo, onClose, onAdicionados }: AddS
   ];
 
   const colunasSelecionados: ColumnsType<SkuResumo> = [
-    { title: 'CÓDIGO', dataIndex: 'codigo', width: 110 },
+    { title: 'CÓDIGO', dataIndex: 'codigoSku', width: 110 },
     { title: 'DESCRIÇÃO', dataIndex: 'descricao' },
     {
       title: '',
@@ -132,7 +132,7 @@ export function AddSkusModal({ open, gradeCodigo, onClose, onAdicionados }: AddS
           danger
           size="small"
           icon={<DeleteOutlined />}
-          onClick={() => handleRemoverSelecionado(sku.codigo)}
+          onClick={() => handleRemoverSelecionado(sku.codigoSku)}
         />
       ),
     },
@@ -165,7 +165,7 @@ export function AddSkusModal({ open, gradeCodigo, onClose, onAdicionados }: AddS
         size="small"
         columns={colunasResultados}
         dataSource={resultados}
-        rowKey="codigo"
+        rowKey="codigoSku"
         loading={buscando}
         pagination={{ pageSize: 5, hideOnSinglePage: true }}
         scroll={{ y: 180 }}
@@ -181,7 +181,7 @@ export function AddSkusModal({ open, gradeCodigo, onClose, onAdicionados }: AddS
         size="small"
         columns={colunasSelecionados}
         dataSource={selecionados}
-        rowKey="codigo"
+        rowKey="codigoSku"
         pagination={{ pageSize: 5, hideOnSinglePage: true }}
         scroll={{ y: 180 }}
         locale={{ emptyText: 'Nenhum SKU selecionado ainda — use a busca acima.' }}

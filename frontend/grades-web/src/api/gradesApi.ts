@@ -30,13 +30,13 @@ api.interceptors.request.use(async (config) => {
   return config;
 });
 
-export async function listarGrades(filtro: { codigo?: number; nome?: string }): Promise<GradeListItem[]> {
+export async function listarGrades(filtro: { codigoGrade?: number; nome?: string }): Promise<GradeListItem[]> {
   const { data } = await api.get<GradeListItem[]>('', { params: filtro });
   return data;
 }
 
-export async function obterDetalheGrade(codigo: number): Promise<GradeDetalhe> {
-  const { data } = await api.get<GradeDetalhe>(`/${codigo}`);
+export async function obterDetalheGrade(codigoGrade: number): Promise<GradeDetalhe> {
+  const { data } = await api.get<GradeDetalhe>(`/${codigoGrade}`);
   return data;
 }
 
@@ -45,27 +45,27 @@ export async function criarGrade(valores: GradeFormValues): Promise<Grade> {
   return data;
 }
 
-export async function atualizarGrade(codigo: number, valores: GradeFormValues): Promise<Grade> {
-  const { data } = await api.put<Grade>(`/${codigo}`, valores);
+export async function atualizarGrade(codigoGrade: number, valores: GradeFormValues): Promise<Grade> {
+  const { data } = await api.put<Grade>(`/${codigoGrade}`, valores);
   return data;
 }
 
-export async function excluirGrade(codigo: number): Promise<void> {
-  await api.delete(`/${codigo}`);
+export async function excluirGrade(codigoGrade: number): Promise<void> {
+  await api.delete(`/${codigoGrade}`);
 }
 
-export async function buscarSkusDisponiveis(codigo: number, termo: string): Promise<SkuResumo[]> {
-  const { data } = await api.get<SkuResumo[]>(`/${codigo}/skus-disponiveis`, { params: { termo } });
+export async function buscarSkusDisponiveis(codigoGrade: number, termo: string): Promise<SkuResumo[]> {
+  const { data } = await api.get<SkuResumo[]>(`/${codigoGrade}/skus-disponiveis`, { params: { termo } });
   return data;
 }
 
-export async function adicionarSkus(codigo: number, skus: string[]): Promise<AtualizarSkusResult> {
-  const { data } = await api.post<AtualizarSkusResult>(`/${codigo}/skus`, { skus });
+export async function adicionarSkus(codigoGrade: number, skus: string[]): Promise<AtualizarSkusResult> {
+  const { data } = await api.post<AtualizarSkusResult>(`/${codigoGrade}/skus`, { skus });
   return data;
 }
 
-export async function removerSkus(codigo: number, skus: string[]): Promise<AtualizarSkusResult> {
-  const { data } = await api.post<AtualizarSkusResult>(`/${codigo}/skus/remover`, { skus });
+export async function removerSkus(codigoGrade: number, skus: string[]): Promise<AtualizarSkusResult> {
+  const { data } = await api.post<AtualizarSkusResult>(`/${codigoGrade}/skus/remover`, { skus });
   return data;
 }
 
@@ -78,7 +78,14 @@ export async function listarSkusOrfaos(
   return data;
 }
 
-export async function listarGradesVazias(filtro: { codigo?: number; nome?: string }): Promise<GradeListItem[]> {
+// Link direto (não passa pelo axios): o navegador baixa o CSV em streaming,
+// sem carregar o arquivo inteiro na memória da página.
+export function urlExportarSkusOrfaos(termo?: string): string {
+  const query = termo ? `?${new URLSearchParams({ termo })}` : '';
+  return `${baseURL}/skus-orfaos/exportar${query}`;
+}
+
+export async function listarGradesVazias(filtro: { codigoGrade?: number; nome?: string }): Promise<GradeListItem[]> {
   const { data } = await api.get<GradeListItem[]>('/grades-vazias', { params: filtro });
   return data;
 }

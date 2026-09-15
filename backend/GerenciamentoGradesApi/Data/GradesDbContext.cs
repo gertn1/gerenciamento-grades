@@ -7,12 +7,8 @@ namespace GerenciamentoGradesApi.Data;
 // rodar `Database.Migrate()` nem gerar Migrations a partir deste contexto.
 // O schema é administrado fora desta API; os scripts de criação ficam em
 // backend/database.
-public class GradesDbContext : DbContext
+public class GradesDbContext(DbContextOptions<GradesDbContext> options) : DbContext(options)
 {
-    public GradesDbContext(DbContextOptions<GradesDbContext> options) : base(options)
-    {
-    }
-
     public DbSet<Grade> Grades => Set<Grade>();
     public DbSet<ProdutoMestre> ProdutosMestre => Set<ProdutoMestre>();
     public DbSet<GradeAuditoria> Auditorias => Set<GradeAuditoria>();
