@@ -57,7 +57,7 @@ public class GradeRepository(GradesDbContext context, IAuditoriaRepository audit
     public async Task<IEnumerable<SkuResumo>> BuscarSkusDisponiveisAsync(string termo, int codigoGradeAtual)
     {
         var query = context.ProdutosMestre.AsNoTracking()
-            .Where(p => p.CodigoGradePrecos == null || p.CodigoGradePrecos != codigoGradeAtual);
+            .Where(p => p.CodigoGradePrecos == null) ;
 
         if (!string.IsNullOrWhiteSpace(termo))
         {

@@ -8,11 +8,11 @@ namespace GerenciamentoGradesApi.Services;
 
 public class PlanilhaGradeService(IGradeRepository gradeRepository) : IPlanilhaGradeService
 {
-    public byte[] GerarModeloCriacaoMassiva() => GerarModelo("Grades", "SKU", "NOME_GRADE", "SIGLA");
+    public byte[] GerarModeloCriacaoMassiva() => GerarModelo("Grades", "NOME_GRADE", "CODIGO_SKU", "SIGLA");
 
     public byte[] GerarModeloImportacaoMassivaAtualizacao() => GerarModelo("SKUs", "CODIGO_GRADE", "CODIGO_SKU");
 
-    public byte[] GerarModeloExclusaoMassivaSkus() => GerarModelo("SKUs", "GRADE", "SKU");
+    public byte[] GerarModeloExclusaoMassivaSkus() => GerarModelo("SKUs", "CODIGO_GRADE", "CODIGO_SKU");
 
     private static byte[] GerarModelo(string nomePlanilha, params string[] colunas)
     {
@@ -30,7 +30,7 @@ public class PlanilhaGradeService(IGradeRepository gradeRepository) : IPlanilhaG
         return stream.ToArray();
     }
 
-    // "Criação massiva": planilha SKU / NOME_GRADE / SIGLA. Cria a grade quando
+    // "Criação massiva": planilha NOME_GRADE / CODIGO_SKU / SIGLA. Cria a grade quando
     // o NOME_GRADE ainda não existe.
     public async Task<ResultadoOperacao<ImportacaoResultResponse>> CriarEmMassaAsync(Stream conteudoArquivo, string nomeArquivo, string matricula)
     {
@@ -169,7 +169,7 @@ public class PlanilhaGradeService(IGradeRepository gradeRepository) : IPlanilhaG
         {
             if (string.IsNullOrWhiteSpace(linha.Sku) || string.IsNullOrWhiteSpace(linha.GradeNome) || string.IsNullOrWhiteSpace(linha.Sigla))
             {
-                erros.Add(new ErroLinhaResponse(linha.Linha, "SKU, NOME_GRADE e SIGLA são obrigatórios."));
+                erros.Add(new ErroLinhaResponse(linha.Linha, "NOME_GRADE, CODIGO_SKU e SIGLA são obrigatórios."));
                 continue;
             }
 
@@ -310,13 +310,13 @@ public class PlanilhaGradeService(IGradeRepository gradeRepository) : IPlanilhaG
         {
             if (string.IsNullOrWhiteSpace(linha.Sku))
             {
-                erros.Add(new ErroLinhaResponse(linha.Linha, "SKU é obrigatório."));
+                erros.Add(new ErroLinhaResponse(linha.Linha, "CODIGO_SKU é obrigatório."));
                 continue;
             }
 
             if (!int.TryParse(linha.Grade, out var codigoGrade))
             {
-                erros.Add(new ErroLinhaResponse(linha.Linha, $"GRADE '{linha.Grade}' inválida — informe o código numérico da grade."));
+                erros.Add(new ErroLinhaResponse(linha.Linha, $"CODIGO_GRADE '{linha.Grade}' inválido — informe o código numérico da grade."));
                 continue;
             }
 
@@ -377,13 +377,13 @@ public class PlanilhaGradeService(IGradeRepository gradeRepository) : IPlanilhaG
     }
 
     private static List<LinhaCriacao> LerPlanilhaCriacao(Stream arquivo) =>
-        LerPlanilha(arquivo, ["SKU", "NOME_GRADE", "SIGLA"], (linha, valores) => new LinhaCriacao(linha, valores[0], valores[1], valores[2]));
+        LerPlanilha(arquivo, ["NOME_GRADE", "CODIGO_SKU", "SIGLA"], (linha, valores) => new LinhaCriacao(linha, Sku: valores[1], GradeNome: valores[0], Sigla: valores[2]));
 
     private static List<LinhaAtualizacao> LerPlanilhaAtualizacao(Stream arquivo) =>
         LerPlanilha(arquivo, ["CODIGO_GRADE", "CODIGO_SKU"], (linha, valores) => new LinhaAtualizacao(linha, valores[0], valores[1]));
 
     private static List<LinhaExclusao> LerPlanilhaExclusao(Stream arquivo) =>
-        LerPlanilha(arquivo, ["GRADE", "SKU"], (linha, valores) => new LinhaExclusao(linha, valores[0], valores[1]));
+        LerPlanilha(arquivo, ["CODIGO_GRADE", "CODIGO_SKU"], (linha, valores) => new LinhaExclusao(linha, valores[0], valores[1]));
 
     // Lê as colunas pedidas (localizadas pelo cabeçalho da linha 1, em qualquer
     // ordem) a partir da linha 2, ignorando linhas totalmente em branco.

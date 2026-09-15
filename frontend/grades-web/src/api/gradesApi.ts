@@ -11,7 +11,8 @@ import type {
   SkusOrfaosResult,
 } from '../types/grade';
 
-export const baseURL = import.meta.env.VITE_API_GRADES_URL ?? 'http://localhost:5244/api/grades';
+// export const baseURL = import.meta.env.VITE_API_GRADES_URL ?? 'http://localhost:5244/api/grades';
+export const baseURL = 'https://localhost:44300/api/grades'; 
 
 const api = axios.create({ baseURL });
 
