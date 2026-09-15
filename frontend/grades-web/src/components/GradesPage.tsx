@@ -12,13 +12,14 @@ import { Button, Card, Col, Input, InputNumber, Row, Space, Table, Typography, m
 import type { ColumnsType } from 'antd/es/table';
 import { useCallback, useEffect, useState } from 'react';
 import {
+  criacaoMassiva,
   exclusaoMassivaSkus,
   extrairMensagemErro,
-  importacaoMassiva,
   importacaoMassivaAtualizacao,
   listarGrades,
+  urlModeloCriacaoMassiva,
   urlModeloExclusaoMassivaSkus,
-  urlModeloImportacaoMassiva,
+  urlModeloImportacaoMassivaAtualizacao,
 } from '../api/gradesApi';
 import type { Grade, GradeListItem } from '../types/grade';
 import { AppHeader } from './AppHeader';
@@ -254,9 +255,9 @@ export function GradesPage() {
         title="Criação massiva de grades"
         subtitle="Crie grades e vincule SKUs de uma vez via arquivo Excel."
         warningText="O código da grade é gerado de forma automática pelo sistema. Preencha somente as colunas informadas no modelo da planilha."
-        templateUrl={urlModeloImportacaoMassiva()}
+        templateUrl={urlModeloCriacaoMassiva()}
         templateFileName="modelo_criacao_massiva_grades.xlsx"
-        onUpload={importacaoMassiva}
+        onUpload={criacaoMassiva}
         onFinished={carregarGrades}
         onClose={() => setCriacaoMassivaAberta(false)}
       />
@@ -265,8 +266,9 @@ export function GradesPage() {
         open={importacaoMassivaAberta}
         title="Importação massiva"
         subtitle="Atualize o vínculo de SKUs em grades já existentes via arquivo Excel — não cria grades novas."
-        templateUrl={urlModeloImportacaoMassiva()}
-        templateFileName="modelo_criacao_massiva_grades.xlsx"
+        warningText="Preencha CODIGO_GRADE com o código de uma grade já existente e CODIGO_SKU com o código do produto."
+        templateUrl={urlModeloImportacaoMassivaAtualizacao()}
+        templateFileName="modelo_importacao_massiva_atualizacao.xlsx"
         onUpload={importacaoMassivaAtualizacao}
         onFinished={carregarGrades}
         onClose={() => setImportacaoMassivaAberta(false)}

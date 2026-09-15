@@ -90,18 +90,22 @@ export async function listarGradesVazias(filtro: { codigoGrade?: number; nome?: 
   return data;
 }
 
-export function urlModeloImportacaoMassiva(): string {
-  return `${baseURL}/importacao-massiva/modelo`;
+export function urlModeloCriacaoMassiva(): string {
+  return `${baseURL}/criacao-massiva/modelo`;
+}
+
+export function urlModeloImportacaoMassivaAtualizacao(): string {
+  return `${baseURL}/importacao-massiva-atualizacao/modelo`;
 }
 
 export function urlModeloExclusaoMassivaSkus(): string {
   return `${baseURL}/exclusao-massiva-skus/modelo`;
 }
 
-export async function importacaoMassiva(arquivo: File): Promise<ImportacaoResult> {
+export async function criacaoMassiva(arquivo: File): Promise<ImportacaoResult> {
   const formData = new FormData();
   formData.append('file', arquivo);
-  const { data } = await api.post<ImportacaoResult>('/importacao-massiva', formData);
+  const { data } = await api.post<ImportacaoResult>('/criacao-massiva', formData);
   return data;
 }
 

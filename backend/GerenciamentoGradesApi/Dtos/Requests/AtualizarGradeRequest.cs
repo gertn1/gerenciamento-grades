@@ -8,5 +8,5 @@ public record AtualizarGradeRequest(
     string Nome,
 
     [Required(ErrorMessage = "Sigla é obrigatória.")]
-    [MaxLength(15, ErrorMessage = "Sigla deve ter no máximo 15 caracteres.")]
+    [MaxLength(35, ErrorMessage = "Sigla deve ter no máximo 35 caracteres.")]
     string Sigla);

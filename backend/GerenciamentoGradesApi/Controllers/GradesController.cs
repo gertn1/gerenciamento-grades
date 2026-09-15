@@ -136,11 +136,18 @@ public class GradesController(
         return NoContent();
     }
 
-    [HttpGet("importacao-massiva/modelo")]
-    public IActionResult BaixarModeloImportacaoMassiva()
+    [HttpGet("criacao-massiva/modelo")]
+    public IActionResult BaixarModeloCriacaoMassiva()
     {
-        var arquivo = planilhaGradeService.GerarModeloImportacaoMassiva();
+        var arquivo = planilhaGradeService.GerarModeloCriacaoMassiva();
         return File(arquivo, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "modelo_criacao_massiva_grades.xlsx");
+    }
+
+    [HttpGet("importacao-massiva-atualizacao/modelo")]
+    public IActionResult BaixarModeloImportacaoMassivaAtualizacao()
+    {
+        var arquivo = planilhaGradeService.GerarModeloImportacaoMassivaAtualizacao();
+        return File(arquivo, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "modelo_importacao_massiva_atualizacao.xlsx");
     }
 
     [HttpGet("exclusao-massiva-skus/modelo")]
@@ -150,14 +157,14 @@ public class GradesController(
         return File(arquivo, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "modelo_exclusao_massiva_skus.xlsx");
     }
 
-    [HttpPost("importacao-massiva")]
+    [HttpPost("criacao-massiva")]
     [RequestSizeLimit(20_000_000)]
-    public async Task<ActionResult<ImportacaoResultResponse>> ImportacaoMassiva(IFormFile? file)
+    public async Task<ActionResult<ImportacaoResultResponse>> CriacaoMassiva(IFormFile? file)
     {
         if (file is null || file.Length == 0)
             return BadRequest(new { mensagem = "Nenhum arquivo enviado." });
 
-        var resultado = await planilhaGradeService.ImportarAsync(file.OpenReadStream(), file.FileName, HttpContext.ObterMatricula());
+        var resultado = await planilhaGradeService.CriarEmMassaAsync(file.OpenReadStream(), file.FileName, HttpContext.ObterMatricula());
 
         return resultado.Status switch
         {

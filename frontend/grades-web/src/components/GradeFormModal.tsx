@@ -71,9 +71,9 @@ export function GradeFormModal({ open, grade, onClose, onSaved }: GradeFormModal
         <Form.Item
           label="Sigla"
           name="sigla"
-          rules={[{ required: true, message: 'Informe a sigla da grade.' }, { max: 15, message: 'Máximo de 15 caracteres.' }]}
+          rules={[{ required: true, message: 'Informe a sigla da grade.' }, { max: 35, message: 'Máximo de 35 caracteres.' }]}
         >
-          <Input placeholder="Ex: COND SEDA" showCount maxLength={15} />
+          <Input placeholder="Ex: COND SEDA" showCount maxLength={35} />
         </Form.Item>
       </Form>
     </Modal>
