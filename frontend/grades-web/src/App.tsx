@@ -1,17 +1,20 @@
-import { ConfigProvider, Layout } from 'antd';
-import ptBR from 'antd/locale/pt_BR';
-import { GradesPage } from './components/GradesPage';
-import { MatriculaGate } from './components/MatriculaGate';
+import React from 'react';
+import { BrowserRouter } from 'react-router-dom';
+import { ConfigProvider } from 'antd';
+import locale from 'antd/locale/pt_BR';
+import 'antd/dist/reset.css';
+import AppRoutes from './router';
+import ModalMatricula from './components/Grades/ModalMatricula';
 
-function App() {
+const App: React.FC = () => {
   return (
-    <ConfigProvider locale={ptBR} theme={{ token: { colorPrimary: '#0b3d63' } }}>
-      <Layout style={{ minHeight: '100vh', background: '#f0f2f5' }}>
-        <GradesPage />
-      </Layout>
-      <MatriculaGate />
+    <ConfigProvider locale={locale}>
+      <BrowserRouter>
+        <AppRoutes />
+      </BrowserRouter>
+      <ModalMatricula />
     </ConfigProvider>
   );
-}
+};
 
 export default App;
