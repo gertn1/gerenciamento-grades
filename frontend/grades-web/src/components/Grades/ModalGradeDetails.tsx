@@ -7,11 +7,15 @@ import ModalAddSkus from './ModalAddSkus';
 import { fetchGradeDetail, fetchRemoveSkus } from '../../services/gradeApi';
 import { type RootState, useAppDispatch } from '../../store';
 import { clearGradeDetail } from '../../store/grades/gradeDetailSlice';
-import type { GradeDetalhe, SkuResumo } from '../../store/grades/types';
+import type { GradeDetalhe, SkuGrade } from '../../store/grades/types';
 import { alertError, alertSuccess, confirmAction } from '../../utils/alerts';
 import { getErrorMessage } from '../../utils/apiError';
 
 const { Text } = Typography;
+
+const formatadorMoeda = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
+
+const formatarPreco = (valor: number | null) => (valor === null ? '—' : formatadorMoeda.format(valor));
 
 type Props = {
   isOpen: boolean;
@@ -73,7 +77,7 @@ const ModalGradeDetails: React.FC<Props> = ({ isOpen, codigoGrade, handleCancel,
     return detalhe.skus.filter((sku) => sku.codigoSku.toLowerCase().includes(termo) || sku.descricao.toLowerCase().includes(termo));
   }, [detalhe, filtro]);
 
-  const columns: ColumnsType<SkuResumo> = [
+  const columns: ColumnsType<SkuGrade> = [
     {
       title: 'Código',
       dataIndex: 'codigoSku',
@@ -83,6 +87,26 @@ const ModalGradeDetails: React.FC<Props> = ({ isOpen, codigoGrade, handleCancel,
     {
       title: 'Descrição',
       dataIndex: 'descricao',
+    },
+    {
+      title: 'Categoria (N3+N4)',
+      dataIndex: 'categoria',
+      width: 200,
+      render: (categoria: string | null) => <Text type="secondary">{categoria ?? '—'}</Text>,
+    },
+    {
+      title: 'Preço Lista',
+      dataIndex: 'precoLista',
+      width: 120,
+      align: 'right',
+      render: (preco: number | null) => <Text strong>{formatarPreco(preco)}</Text>,
+    },
+    {
+      title: 'Preço Venda',
+      dataIndex: 'precoVenda',
+      width: 120,
+      align: 'right',
+      render: (preco: number | null) => formatarPreco(preco),
     },
     {
       title: '',
@@ -103,7 +127,7 @@ const ModalGradeDetails: React.FC<Props> = ({ isOpen, codigoGrade, handleCancel,
         open={isOpen}
         onCancel={handleCancel}
         afterClose={handleAfterClose}
-        width={760}
+        width={1100}
         destroyOnClose
         footer={
           detalhe && (

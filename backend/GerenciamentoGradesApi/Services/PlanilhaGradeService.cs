@@ -297,6 +297,9 @@ public class PlanilhaGradeService(IGradeRepository gradeRepository) : IPlanilhaG
         return await gradeRepository.CriarAsync(gradeNome, siglaGrade, matricula);
     }
 
+
+    // "Excluisao massiva" : planilha CODIGO_GRADE / CODIGO_SKU.
+    // Só vincula SKUs a grades que já existem — nunca cria grade nova.
     public async Task<ResultadoOperacao<ImportacaoResultResponse>> ExcluirSkusEmMassaAsync(Stream conteudoArquivo, string nomeArquivo, string matricula)
     {
         var (linhas, erroLeitura) = LerArquivo(conteudoArquivo, nomeArquivo, LerPlanilhaExclusao);

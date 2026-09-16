@@ -16,8 +16,14 @@ export interface SkuResumo {
   descricao: string;
 }
 
+export interface SkuGrade extends SkuResumo {
+  categoria: string | null;
+  precoLista: number | null;
+  precoVenda: number | null;
+}
+
 export interface GradeDetalhe extends Grade {
-  skus: SkuResumo[];
+  skus: SkuGrade[];
 }
 
 export interface SkuRejeitado {
